@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Pathly_Services</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.AI.DocumentIntelligence" Version="1.0.0" />
+    <PackageReference Include="IKVM" Version="8.15.0" />
+    <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pathly Core\Pathly Core.csproj" />
+    <ProjectReference Include="..\Pathly Helper\Pathly Helper.csproj" />
+    <ProjectReference Include="..\PathlyInterfaces\PathlyInterfaces.csproj" />
+  </ItemGroup>
+
+</Project>

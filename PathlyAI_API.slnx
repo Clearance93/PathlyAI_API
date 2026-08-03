@@ -1,0 +1,13 @@
+<Solution>
+  <Project Path="Pathly Core/Pathly Core.csproj" />
+  <Project Path="Pathly Data/Pathly Data.csproj" />
+  <Project Path="Pathly DTOs/Pathly DTOs.csproj" />
+  <Project Path="Pathly Enums/Pathly Enums.csproj" Id="5e530805-b455-4322-824b-1e062519a3ec" />
+  <Project Path="Pathly Helper/Pathly Helper.csproj" Id="312f393a-e03b-42d4-95f6-e289c4dc21af" />
+  <Project Path="Pathly Models/Pathly Models.csproj" />
+  <Project Path="Pathly Services/Pathly Services.csproj" Id="bb05bf3c-443b-47ad-9018-44a86535db52" />
+  <Project Path="Pathly Utility/Pathly Utility.csproj" />
+  <Project Path="PathlyAI_API/PathlyAI_API.csproj" />
+  <Project Path="PathlyInterfaces/PathlyInterfaces.csproj" />
+  <Project Path="PathlyRepository/PathlyRepository.csproj" Id="ca1afbf3-c852-479f-a568-58fc77284988" />
+</Solution>
