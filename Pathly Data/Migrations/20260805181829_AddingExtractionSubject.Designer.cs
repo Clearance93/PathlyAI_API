@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Pathly_Data;
 
@@ -11,9 +12,11 @@ using Pathly_Data;
 namespace Pathly_Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260805181829_AddingExtractionSubject")]
+    partial class AddingExtractionSubject
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -632,6 +635,9 @@ namespace Pathly_Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ExtractedAcademicRecordExtractionAcademicRecordId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("MarkType")
                         .HasColumnType("nvarchar(max)");
 
@@ -648,6 +654,8 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("ExtractionSubjectId");
+
+                    b.HasIndex("ExtractedAcademicRecordExtractionAcademicRecordId");
 
                     b.ToTable("ExtractedSubjects");
                 });
@@ -846,6 +854,13 @@ namespace Pathly_Data.Migrations
                     b.HasOne("Pathly_Models.AiResponse", null)
                         .WithMany("EmploymentOutlooks")
                         .HasForeignKey("AiResponseId");
+                });
+
+            modelBuilder.Entity("Pathly_Models.ExtractedSubject", b =>
+                {
+                    b.HasOne("Pathly_Models.ExtractedAcademicRecord", null)
+                        .WithMany("Subjects")
+                        .HasForeignKey("ExtractedAcademicRecordExtractionAcademicRecordId");
                 });
 
             modelBuilder.Entity("Pathly_Models.SubjectResults", b =>

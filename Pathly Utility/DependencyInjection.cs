@@ -52,6 +52,8 @@ namespace Pathly_Utility
             services.AddScoped<IEmploymentOutlookRepositoryInterface, EmploymentOutlookRepository>();
             services.AddScoped<IDyingCareerWarningRepositoyInterface, DyingCareerWarningRepository>();
             services.AddScoped<IApsAnalysisRepositoryInterface, ApsAnalysisRepository>();
+            services.AddScoped<ExtractedAcademicRecordInterfaceRepository, ExtractedAcademicRecordRepository>();
+            services.AddScoped<IExtractedSubjectInterfaceRepository, ExtractedSubjectRepository>();
 
             //Services
             services.AddScoped<IAuthServiceInterface, AuthenticationService>();

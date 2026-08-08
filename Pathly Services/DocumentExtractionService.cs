@@ -1,7 +1,10 @@
-﻿using Azure;
+﻿using AutoMapper;
+using Azure;
 using Azure.AI.DocumentIntelligence;
 using Microsoft.Extensions.Configuration;
+using Pathly_Core.Unit;
 using Pathly_DTOs;
+using Pathly_Models;
 using PathlyInterfaces.IService;
 using System.Text.RegularExpressions;
 
@@ -10,6 +13,8 @@ namespace Pathly_Services
     public class DocumentExtractionService : IDocumentExtractionService
     {
         private readonly DocumentIntelligenceClient _Client;
+        private readonly IUnitOfWork _unit;
+        private readonly IMapper _mapper;
 
         private static readonly Dictionary<string, string[]> FieldLabelVariants = new()
         {
@@ -17,7 +22,9 @@ namespace Pathly_Services
             ["School"] = new[] { "School", "Institution", "University", "College", "TVET" },
         };
 
-        public DocumentExtractionService(IConfiguration config)
+        public DocumentExtractionService(IConfiguration config,
+                                         IUnitOfWork unit,
+                                         IMapper mapper)
         {
             var endpoint = config["AzureDocumentIntelligence:Endpoint"]
                 ?? throw new InvalidOperationException("AzureDocumentIntelligence:Endpoint is not configured.");
@@ -25,6 +32,8 @@ namespace Pathly_Services
                 ?? throw new InvalidOperationException("AzureDocumentIntelligence:Key is not configured.");
 
             _Client = new DocumentIntelligenceClient(new Uri(endpoint), new AzureKeyCredential(key));
+            _unit = unit ?? throw new ArgumentNullException(nameof(unit));
+            _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
 
         public async Task<ExtractedAcademicRecordDto> ExtractAcademicRecordAsync(string base64File, string mimeType, string? fileName)
@@ -38,7 +47,7 @@ namespace Pathly_Services
 
             var record = new ExtractedAcademicRecordDto
             {
-                Subjects = ExtractSubjectsFromTables(result.Tables),
+                Subjects = await ExtractSubjectsFromTables(result.Tables),
                 RawExtractedText = result.Content,
                 ExtractedAt = DateTime.Now
             };
@@ -48,7 +57,7 @@ namespace Pathly_Services
             return record;
         }
 
-        private List<ExtractedSubjectDto> ExtractSubjectsFromTables(IReadOnlyList<DocumentTable> tables)
+        private async Task<List<ExtractedSubjectDto>> ExtractSubjectsFromTables(IReadOnlyList<DocumentTable> tables)
         {
             var subjectTable = tables.FirstOrDefault(t =>
             {
@@ -97,7 +106,13 @@ namespace Pathly_Services
                     Symbol = gradeRaw,
                     MarkType = hasNumericMark ? "Percentage" : "Symbol"
                 });
+
+                var addSubject = _mapper.Map<ExtractedSubject>(subjects);
+
+                await _unit.SubjectExtraction.AddAsync(addSubject);
             }
+
+            await _unit.SaveChangesAsync();
 
             return subjects;
         }
@@ -120,8 +135,6 @@ namespace Pathly_Services
                     return ((int)Math.Round(normalized), marksObtainedRaw);
                 }
 
-                // No usable Max Marks column, or it's already out of 100 —
-                // treat Marks Obtained as the percentage directly.
                 return ((int)Math.Round(marksObtainedValue), marksObtainedRaw);
             }
 
@@ -144,8 +157,6 @@ namespace Pathly_Services
 
                 if (match != null)
                 {
-                    // Normalize "Maximum Marks" to the same key as "Max Marks"
-                    // so ResolveNumericMark only needs to check one name.
                     var canonical = match.Equals("Maximum Marks", StringComparison.OrdinalIgnoreCase)
                         ? "Max Marks"
                         : match;

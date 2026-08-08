@@ -8,6 +8,10 @@ namespace Pathly_Core.Unit
 
         IaiResponseRepositoryInterface AiResponse { get; }
 
+        ExtractedAcademicRecordInterfaceRepository ExtractedAcademicRecord { get; }
+
+        IExtractedSubjectInterfaceRepository SubjectExtraction { get; }
+
         ISubjectResultsRepositoryInterface SubjectResults { get; }
 
         ICareerMatchRepositoryInterface CareerMatch { get; }
