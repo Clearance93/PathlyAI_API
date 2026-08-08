@@ -26,6 +26,10 @@ namespace Pathly_Core.Unit
 
         IAuthenticationRepository User { get; }
 
+        ExtractedAcademicRecordInterfaceRepository ExtractedAcademicRecord { get; }
+
+        IExtractedSubjectInterfaceRepository ExtractedSubject { get; }
+
         Task<int> SaveChangesAsync();
     }
 }

@@ -15,6 +15,13 @@
 
         public string? ResponseJson { get; set; }
 
+        /// <summary>
+        /// SHA-256 fingerprint of the normalized subject/mark set (+ study level) that produced this
+        /// response. Used to serve repeat requests for the same academic record straight from the
+        /// database instead of paying for another LLM call. Not a security hash — just a cache key.
+        /// </summary>
+        public string? SubjectSetHash { get; set; }
+
         public double OverallScore { get; set; }
 
         public string? AcademicPersonality { get; set; }

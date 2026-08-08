@@ -27,7 +27,7 @@ namespace Pathly_Core.Unit
 
         public ExtractedAcademicRecordInterfaceRepository ExtractedAcademicRecord { get; private set; }
 
-        public IExtractedSubjectInterfaceRepository SubjectExtraction { get; private set; }
+        public IExtractedSubjectInterfaceRepository ExtractedSubject { get; private set; }
 
         public UnitOfWork(ApplicationDbContext context,
                           IAcademicRecordRepositoryInterface academicRecord,
@@ -39,8 +39,8 @@ namespace Pathly_Core.Unit
                           ICareerMatchRepositoryInterface careerMatch,
                           ISubjectResultsRepositoryInterface subjectResults,
                           IApsAnalysisRepositoryInterface apsAnalysis,
-                          IExtractedSubjectInterfaceRepository subjectExtraction,
-                          ExtractedAcademicRecordInterfaceRepository extractedAcademicRecord)
+                          ExtractedAcademicRecordInterfaceRepository extractedAcademicRecord,
+                          IExtractedSubjectInterfaceRepository extractedSubject)
         {
             _Context = context;
             AcademicRecord = academicRecord ?? throw new ArgumentNullException(nameof(academicRecord));
@@ -52,8 +52,8 @@ namespace Pathly_Core.Unit
             CareerMatch = careerMatch ?? throw new ArgumentNullException(nameof(careerMatch));
             SubjectResults = subjectResults ?? throw new ArgumentNullException(nameof(subjectResults));
             ApsAnalysis = apsAnalysis ?? throw new ArgumentNullException(nameof(apsAnalysis));
-            SubjectExtraction = subjectExtraction ?? throw new ArgumentNullException(nameof(subjectExtraction));
             ExtractedAcademicRecord = extractedAcademicRecord ?? throw new ArgumentNullException(nameof(extractedAcademicRecord));
+            ExtractedSubject = extractedSubject ?? throw new ArgumentNullException(nameof(extractedSubject));
         }
 
         public void Dispose()

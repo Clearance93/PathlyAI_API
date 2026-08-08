@@ -21,6 +21,12 @@ namespace Pathly_Utility
         {
             services.AddHttpClient();
 
+            // Typed clients: plain AddScoped<GroqService>()/AddScoped<AzureModelRouterService>()
+            // can't resolve a bare HttpClient constructor parameter — this is what actually
+            // gives each service a managed HttpClient instance.
+            services.AddHttpClient<GroqService>();
+            services.AddHttpClient<AzureModelRouterService>();
+
             services.AddSingleton(provider =>
             {
                 var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
@@ -61,7 +67,10 @@ namespace Pathly_Utility
             services.AddScoped<ICareerAnalysisService, CareerAnalysisService>();
             services.AddScoped<IApsCalculationService, ApsCalculationService>();
 
-            services.AddScoped<IGroqService, AzureModelRouterService>();
+            // Cost-aware AI failover: try Groq first, fall back to Azure Model Router only
+            // if Groq fails or returns nothing usable. CareerAnalysisService only ever sees
+            // IGroqService, so it doesn't need to know a fallback exists.
+            services.AddScoped<IGroqService, ResilientCareerAiService>();
 
             //Unit of Work
             services.AddScoped<IUnitOfWork, UnitOfWork>();

@@ -22,9 +22,22 @@ namespace Pathly_Services
             ["School"] = new[] { "School", "Institution", "University", "College", "TVET" },
         };
 
-        public DocumentExtractionService(IConfiguration config,
-                                         IUnitOfWork unit,
-                                         IMapper mapper)
+        // Cambridge Statements of Results (IGCSE / AS & A Level) only ever publish a letter
+        // grade — no raw marks or percentage. This is NOT Cambridge's official UMS conversion;
+        // it's an internal estimate so grade-only results can still flow through the same
+        // numeric APS pipeline as percentage-based (NSC/TVET) results.
+        private static readonly Dictionary<string, int> CambridgeGradeToPercentage = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["A*"] = 90,
+            ["A"] = 80,
+            ["B"] = 70,
+            ["C"] = 60,
+            ["D"] = 50,
+            ["E"] = 40,
+            ["U"] = 0,
+        };
+
+        public DocumentExtractionService(IConfiguration config)
         {
             var endpoint = config["AzureDocumentIntelligence:Endpoint"]
                 ?? throw new InvalidOperationException("AzureDocumentIntelligence:Endpoint is not configured.");
@@ -62,8 +75,17 @@ namespace Pathly_Services
             var subjectTable = tables.FirstOrDefault(t =>
             {
                 var headerRow = t.Cells.Where(c => c.RowIndex == 0).Select(c => c.Content).ToList();
-                return headerRow.Any(h => h.Contains("Subject", StringComparison.OrdinalIgnoreCase))
-                    && headerRow.Any(h => h.Contains("Marks Obtained", StringComparison.OrdinalIgnoreCase));
+
+                var hasSubjectColumn = headerRow.Any(h => h.Contains("Subject", StringComparison.OrdinalIgnoreCase));
+
+                // Accept any of the mark representations we know how to parse: NSC/TVET-style
+                // marks or percentage columns, or a Cambridge-style Grade-only column.
+                var hasAMarkColumn = headerRow.Any(h =>
+                    h.Contains("Marks Obtained", StringComparison.OrdinalIgnoreCase) ||
+                    h.Contains("Percentage", StringComparison.OrdinalIgnoreCase) ||
+                    h.Contains("Grade", StringComparison.OrdinalIgnoreCase));
+
+                return hasSubjectColumn && hasAMarkColumn;
             });
 
             if (subjectTable is null) return new List<ExtractedSubjectDto>();
@@ -94,17 +116,16 @@ namespace Pathly_Services
                 }
 
                 var gradeRaw = GetCell("Grade");
-                var (numericMark, rawMarkSource) = ResolveNumericMark(GetCell);
-                var hasNumericMark = numericMark.HasValue;
+                var (numericMark, rawMarkSource, markType) = ResolveNumericMark(GetCell, gradeRaw);
 
                 subjects.Add(new ExtractedSubjectDto
                 {
                     ExtractionSubjectId = Guid.NewGuid(),
                     SubjectName = subjectName,
-                    RawMark = hasNumericMark ? rawMarkSource : gradeRaw,
+                    RawMark = rawMarkSource ?? gradeRaw,
                     NumericMark = numericMark,
                     Symbol = gradeRaw,
-                    MarkType = hasNumericMark ? "Percentage" : "Symbol"
+                    MarkType = markType
                 });
 
                 var addSubject = _mapper.Map<ExtractedSubject>(subjects);
@@ -117,12 +138,12 @@ namespace Pathly_Services
             return subjects;
         }
 
-        private static (int? NumericMark, string? RawMarkSource) ResolveNumericMark(Func<string, string?> getCell)
+        private static (int? NumericMark, string? RawMarkSource, string MarkType) ResolveNumericMark(Func<string, string?> getCell, string? gradeRaw)
         {
             var percentageRaw = getCell("Percentage")?.TrimEnd('%');
             if (decimal.TryParse(percentageRaw, out var percentageValue))
             {
-                return ((int)Math.Round(percentageValue), getCell("Percentage"));
+                return ((int)Math.Round(percentageValue), getCell("Percentage"), "Percentage");
             }
 
             var marksObtainedRaw = getCell("Marks Obtained");
@@ -132,13 +153,24 @@ namespace Pathly_Services
                 if (decimal.TryParse(maxMarksRaw, out var maxMarksValue) && maxMarksValue > 0 && maxMarksValue != 100)
                 {
                     var normalized = (marksObtainedValue / maxMarksValue) * 100m;
-                    return ((int)Math.Round(normalized), marksObtainedRaw);
+                    return ((int)Math.Round(normalized), marksObtainedRaw, "Percentage");
                 }
 
-                return ((int)Math.Round(marksObtainedValue), marksObtainedRaw);
+                // No usable Max Marks column, or it's already out of 100 —
+                // treat Marks Obtained as the percentage directly.
+                return ((int)Math.Round(marksObtainedValue), marksObtainedRaw, "Percentage");
             }
 
-            return (null, null);
+            // No marks/percentage columns at all — this is a Cambridge-style, grade-only
+            // result sheet. Map the letter grade to an APS-equivalent percentage so it can
+            // still be scored, but keep the MarkType honest about where the number came from.
+            if (!string.IsNullOrWhiteSpace(gradeRaw) &&
+                CambridgeGradeToPercentage.TryGetValue(gradeRaw.Trim(), out var gradeEquivalent))
+            {
+                return (gradeEquivalent, gradeRaw, "GradeEquivalent");
+            }
+
+            return (null, null, "Symbol");
         }
 
         private Dictionary<string, int> MapHeaderColumns(DocumentTable subjectTable)
