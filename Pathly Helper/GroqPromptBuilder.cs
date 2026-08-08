@@ -25,13 +25,27 @@ namespace Pathly_Helper
             12. Respond with valid JSON only — no markdown, no commentary, nothing outside the JSON object.";
         }
 
+        private static string FormatSubjectLine(ExtractedSubjectDto s)
+        {
+            // Cambridge-style results: we've estimated a percentage from the letter grade for
+            // scoring purposes, but the model should reason from the real grade, not the estimate.
+            if (s.MarkType == "GradeEquivalent" && s.NumericMark.HasValue)
+            {
+                return $"- {s.SubjectName}: Grade {s.Symbol} (internal estimate ~{s.NumericMark}% for scoring)";
+            }
+
+            if (s.NumericMark.HasValue)
+            {
+                return $"- {s.SubjectName}: {s.NumericMark}%";
+            }
+
+            return $"- {s.SubjectName}: {s.Symbol}";
+        }
+
         public static string BuildUserPrompt(ExtractedAcademicRecordDto record, ApsResultDto apsResult)
         {
             var subjectSummary = record.Subjects.Any()
-                ? string.Join("\n", record.Subjects.Select(s =>
-                    s.NumericMark.HasValue
-                        ? $"- {s.SubjectName}: {s.NumericMark}%"
-                        : $"- {s.SubjectName}: {s.Symbol}"))
+                ? string.Join("\n", record.Subjects.Select(FormatSubjectLine))
                 : "No subjects extracted.";
 
             var qualifies = apsResult.TotalAps >= 30 ? "true" : "false";
