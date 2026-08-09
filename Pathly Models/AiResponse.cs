@@ -22,6 +22,22 @@
         /// </summary>
         public string? SubjectSetHash { get; set; }
 
+        /// <summary>
+        /// Only set on premium (Layer 2) analyses — the exact fingerprint of the psychometric
+        /// profile used, so identical-academics-but-different-psychometrics learners never
+        /// share a cache entry (Part 13).
+        /// </summary>
+        public string? PsychometricHash { get; set; }
+
+        /// <summary>Reasoning/recommendation logic version this result was generated under (Part 5).</summary>
+        public string? AnalysisVersion { get; set; }
+
+        /// <summary>Prompt template version this result was generated under (Part 5).</summary>
+        public string? PromptVersion { get; set; }
+
+        /// <summary>True for Layer 2 (academic + psychometric) analyses, false for Layer 1 (academic-only).</summary>
+        public bool IsPremium { get; set; }
+
         public double OverallScore { get; set; }
 
         public string? AcademicPersonality { get; set; }

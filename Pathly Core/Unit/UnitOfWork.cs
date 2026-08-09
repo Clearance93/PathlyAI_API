@@ -29,6 +29,12 @@ namespace Pathly_Core.Unit
 
         public IExtractedSubjectInterfaceRepository ExtractedSubject { get; private set; }
 
+        public ISubjectRepositoryInterface Subject { get; private set; }
+
+        public ICareerProfileRepositoryInterface CareerProfile { get; private set; }
+
+        public IPsychometricProfileRepositoryInterface PsychometricProfile { get; private set; }
+
         public UnitOfWork(ApplicationDbContext context,
                           IAcademicRecordRepositoryInterface academicRecord,
                           IAuthenticationRepository user,
@@ -40,7 +46,10 @@ namespace Pathly_Core.Unit
                           ISubjectResultsRepositoryInterface subjectResults,
                           IApsAnalysisRepositoryInterface apsAnalysis,
                           ExtractedAcademicRecordInterfaceRepository extractedAcademicRecord,
-                          IExtractedSubjectInterfaceRepository extractedSubject)
+                          IExtractedSubjectInterfaceRepository extractedSubject,
+                          ISubjectRepositoryInterface subject,
+                          ICareerProfileRepositoryInterface careerProfile,
+                          IPsychometricProfileRepositoryInterface psychometricProfile)
         {
             _Context = context;
             AcademicRecord = academicRecord ?? throw new ArgumentNullException(nameof(academicRecord));
@@ -54,6 +63,9 @@ namespace Pathly_Core.Unit
             ApsAnalysis = apsAnalysis ?? throw new ArgumentNullException(nameof(apsAnalysis));
             ExtractedAcademicRecord = extractedAcademicRecord ?? throw new ArgumentNullException(nameof(extractedAcademicRecord));
             ExtractedSubject = extractedSubject ?? throw new ArgumentNullException(nameof(extractedSubject));
+            Subject = subject ?? throw new ArgumentNullException(nameof(subject));
+            CareerProfile = careerProfile ?? throw new ArgumentNullException(nameof(careerProfile));
+            PsychometricProfile = psychometricProfile ?? throw new ArgumentNullException(nameof(psychometricProfile));
         }
 
         public void Dispose()

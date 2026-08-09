@@ -9,17 +9,13 @@ using System.Text.Json;
 namespace Pathly_Services
 {
     /// <summary>
-    /// Layer 1 (Part 6): academic-only career analysis. Works without any psychometric data
-    /// and must remain genuinely useful on its own — see Part 8's upsell message, which
-    /// encourages (never demands) completing the premium psychometric layer.
+    /// Layer 2 (Part 6/7): premium academic + psychometric career intelligence. Reuses the same
+    /// extraction/APS/subject-knowledge pipeline as Layer 1, but the cache key AND the AI prompt
+    /// also incorporate the learner's exact psychometric profile (Part 13) — two learners with
+    /// identical academics but different psychometrics never share a cached premium result.
     /// </summary>
-    public class CareerAnalysisService : ICareerAnalysisService
+    public class PremiumCareerAnalysisService : IPremiumCareerAnalysisService
     {
-        private const string PsychometricUpsellMessage =
-            "Your academic results show us what you may be academically prepared for. A psychometric " +
-            "assessment can add another layer by helping Pathly understand your interests and preferred " +
-            "ways of working. Combining both can make your career recommendations more personalized.";
-
         private readonly IDocumentExtractionService _ExtractionService;
         private readonly IApsCalculationService _ApsCalculation;
         private readonly ISubjectKnowledgeService _SubjectKnowledge;
@@ -28,7 +24,7 @@ namespace Pathly_Services
         private readonly IMapper _Mapper;
         private readonly IUnitOfWork _Unit;
 
-        public CareerAnalysisService(IDocumentExtractionService extractionService,
+        public PremiumCareerAnalysisService(IDocumentExtractionService extractionService,
                                     IApsCalculationService apsCalculation,
                                     ISubjectKnowledgeService subjectKnowledge,
                                     ICareerEvidenceService careerEvidence,
@@ -37,7 +33,7 @@ namespace Pathly_Services
                                     IUnitOfWork unit)
         {
             _ExtractionService = extractionService ?? throw new ArgumentNullException(nameof(extractionService));
-            _ApsCalculation = apsCalculation ?? throw new ArgumentNullException(nameof(_ApsCalculation));
+            _ApsCalculation = apsCalculation ?? throw new ArgumentNullException(nameof(apsCalculation));
             _SubjectKnowledge = subjectKnowledge ?? throw new ArgumentNullException(nameof(subjectKnowledge));
             _CareerEvidence = careerEvidence ?? throw new ArgumentNullException(nameof(careerEvidence));
             _Groq = groq ?? throw new ArgumentNullException(nameof(groq));
@@ -45,44 +41,45 @@ namespace Pathly_Services
             _Unit = unit ?? throw new ArgumentNullException(nameof(unit));
         }
 
-        public async Task<AiResponseDto> AnalyzeAsync(string base64File, string mimeType, string? fileName)
+        public async Task<AiResponseDto> AnalyzeWithPsychometricsAsync(
+            string base64File,
+            string mimeType,
+            string? fileName,
+            PsychometricProfileDto psychometricProfile)
         {
-            var academicRecord = await _ExtractionService.ExtractAcademicRecordAsync(base64File, mimeType, fileName);
-
-            Console.WriteLine($"Extracted subjects: {academicRecord.Subjects.Count}");
-            foreach (var subject in academicRecord.Subjects)
+            if (psychometricProfile is null)
             {
-                Console.WriteLine($"Subject: {subject.SubjectName} | Mark: {subject.NumericMark} | Symbol: {subject.Symbol}");
+                throw new ArgumentNullException(nameof(psychometricProfile));
             }
 
-            // Persist every extraction, independent of whether we end up hitting an LLM.
-            // This is our own dataset going forward, and it's what the subject-set cache
-            // lookup below is keyed against (Part 2).
-            await PersistExtractedRecordAsync(academicRecord);
+            var academicRecord = await _ExtractionService.ExtractAcademicRecordAsync(base64File, mimeType, fileName);
 
-            // Reusable subject knowledge layer — dedups by normalized name, separate from the
-            // per-document extraction above and from personalized analysis caching (Part 2/15).
+            await PersistExtractedRecordAsync(academicRecord);
             await _SubjectKnowledge.EnsureSubjectsPersistedAsync(academicRecord.Subjects);
+            await PersistPsychometricProfileAsync(psychometricProfile);
 
             var apsResult = _ApsCalculation.CalculateAPS(academicRecord.Subjects);
 
-            Console.WriteLine($"Calculated APS: {apsResult}");
+            // Same evidence engine as Layer 1, but now WITH the psychometric profile factored
+            // into PsychometricFit and therefore OverallScore (Part 7/9/10).
+            var careerEvidence = await _CareerEvidence.ComputeEvidenceAsync(academicRecord, apsResult, psychometricProfile);
 
-            // Deterministic career evidence computed before any AI call (Part 9/10/11).
-            // Cheap to (re)compute every request — no need to cache it separately.
-            var careerEvidence = await _CareerEvidence.ComputeEvidenceAsync(academicRecord, apsResult);
+            var psychometricFingerprint = PsychometricProfileFingerprint.ComputeHash(psychometricProfile);
 
             var subjectSetHash = AcademicRecordFingerprint.ComputeHash(
                 academicRecord,
                 AcademicRecordFingerprint.CurrentAnalysisVersion,
-                GroqPromptBuilder.PromptVersion);
+                GroqPromptBuilder.PromptVersion,
+                psychometricFingerprint);
 
-            var (aiResponse, servedFromCache) = await GetAiResponseAsync(academicRecord, apsResult, careerEvidence, subjectSetHash);
+            var (aiResponse, servedFromCache) = await GetAiResponseAsync(
+                academicRecord, apsResult, careerEvidence, psychometricProfile, subjectSetHash);
 
             ReconcileApsAnalysis(aiResponse, apsResult);
 
             aiResponse.CareerEvidence = careerEvidence;
-            aiResponse.PsychometricUpsellMessage = PsychometricUpsellMessage;
+            // Premium reports already combine both layers — no upsell needed (Part 8).
+            aiResponse.PsychometricUpsellMessage = null;
 
             var apsAnalysisId = Guid.NewGuid();
 
@@ -138,12 +135,11 @@ namespace Pathly_Services
 
                 ResponseJson = JsonSerializer.Serialize(aiResponse),
 
-                // Only a validated, complete response is ever made servable from cache (Part 3).
-                // We still persist the row either way for audit purposes.
                 SubjectSetHash = isCacheable ? subjectSetHash : null,
+                PsychometricHash = psychometricFingerprint,
                 AnalysisVersion = AcademicRecordFingerprint.CurrentAnalysisVersion,
                 PromptVersion = GroqPromptBuilder.PromptVersion,
-                IsPremium = false,
+                IsPremium = true,
 
                 AddedAt = DateTime.Now,
                 TimeStamp = DateTime.Now
@@ -153,16 +149,12 @@ namespace Pathly_Services
             await _Unit.SaveChangesAsync();
 
             Console.WriteLine(servedFromCache
-                ? "AI analysis served from the database cache — no LLM call made."
-                : "AI analysis generated by LLM and cached for future identical subject sets.");
+                ? "Premium AI analysis served from the database cache — no LLM call made."
+                : "Premium AI analysis generated by LLM and cached for future identical academic + psychometric profiles.");
 
             return aiResponse;
         }
 
-        /// <summary>
-        /// Saves the raw extraction (record + every subject) so it's never lost, regardless
-        /// of whether we go on to hit an LLM for it.
-        /// </summary>
         private async Task PersistExtractedRecordAsync(ExtractedAcademicRecordDto academicRecord)
         {
             var extractedRecordEntity = _Mapper.Map<ExtractedAcademicRecord>(academicRecord);
@@ -178,21 +170,35 @@ namespace Pathly_Services
             await _Unit.SaveChangesAsync();
         }
 
-        /// <summary>
-        /// The money-saving step: if we've already analysed this EXACT subject/mark set before
-        /// (same analysis/prompt version, no rounding or fuzzy matching), reuse that stored
-        /// response instead of paying for another LLM call. Only calls out to Groq (with Azure
-        /// Model Router as its own internal fallback) on a genuine cache miss.
-        /// </summary>
+        private async Task PersistPsychometricProfileAsync(PsychometricProfileDto profile)
+        {
+            var entity = new PsychometricProfile
+            {
+                PsychometricProfileId = profile.PsychometricProfileId == Guid.Empty ? Guid.NewGuid() : profile.PsychometricProfileId,
+                Realistic = profile.Realistic,
+                Investigative = profile.Investigative,
+                Artistic = profile.Artistic,
+                Social = profile.Social,
+                Enterprising = profile.Enterprising,
+                Conventional = profile.Conventional,
+                CreatedAt = DateTime.Now
+            };
+
+            await _Unit.PsychometricProfile.AddAsync(entity);
+            await _Unit.SaveChangesAsync();
+        }
+
         private async Task<(AiResponseDto Response, bool ServedFromCache)> GetAiResponseAsync(
             ExtractedAcademicRecordDto academicRecord,
             ApsResultDto apsResult,
             List<CareerEvidenceDto> careerEvidence,
+            PsychometricProfileDto psychometricProfile,
             string subjectSetHash)
         {
             var cached = await _Unit.AiResponse.FindMostRecentBySubjectSetHashAsync(subjectSetHash);
 
             if (cached?.ResponseJson is not null &&
+                cached.IsPremium &&
                 cached.AnalysisVersion == AcademicRecordFingerprint.CurrentAnalysisVersion &&
                 cached.PromptVersion == GroqPromptBuilder.PromptVersion)
             {
@@ -204,28 +210,21 @@ namespace Pathly_Services
 
                     if (cachedResponse is not null)
                     {
-                        Console.WriteLine($"Cache hit for subject set {subjectSetHash} — skipping the LLM call.");
+                        Console.WriteLine($"Premium cache hit for {subjectSetHash} — skipping the LLM call.");
                         return (cachedResponse, true);
                     }
                 }
                 catch (JsonException ex)
                 {
-                    Console.WriteLine($"Cached response for {subjectSetHash} could not be deserialized ({ex.Message}). Falling back to a live call.");
+                    Console.WriteLine($"Cached premium response for {subjectSetHash} could not be deserialized ({ex.Message}). Falling back to a live call.");
                 }
             }
 
-            // Cache miss: Groq first, Azure Model Router as its internal fallback. If both fail,
-            // this throws CareerAnalysisUnavailableException — nothing gets cached (Part 4/3).
-            // No psychometric profile on Layer 1 (academic-only).
-            var freshResponse = await _Groq.AnalyzeAcademicRecordAsync(academicRecord, apsResult, careerEvidence, null);
+            var freshResponse = await _Groq.AnalyzeAcademicRecordAsync(academicRecord, apsResult, careerEvidence, psychometricProfile);
 
             return (freshResponse, false);
         }
 
-        /// <summary>
-        /// Only successfully validated AI responses may be cached (Part 3) — never empty,
-        /// malformed, incomplete, or clearly failed analyses.
-        /// </summary>
         private static bool IsValidForCaching(AiResponseDto? response)
         {
             return response is not null
@@ -248,7 +247,6 @@ namespace Pathly_Services
             }
 
             analysis.CalculatedAps = apsResult.TotalAps;
-
             analysis.ApsExplanation = _ApsCalculation.GetApsExplanation(apsResult.TotalAps);
 
             var allUniversities = (analysis.UniversitiesTheyQualifyFor ?? new()).Concat(analysis.UniversitiesTheyDoNotQualifyFor ?? new())
@@ -267,9 +265,7 @@ namespace Pathly_Services
             }
 
             analysis.UniversitiesTheyQualifyFor = allUniversities.Where(u => apsResult.TotalAps >= u.MinimumAps).ToList();
-
             analysis.UniversitiesTheyDoNotQualifyFor = allUniversities.Where(u => apsResult.TotalAps < u.MinimumAps).ToList();
-
             analysis.QualifiesForUniveisty = analysis.UniversitiesTheyQualifyFor.Count > 0;
         }
     }

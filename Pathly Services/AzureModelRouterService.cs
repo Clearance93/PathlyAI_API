@@ -16,7 +16,7 @@ namespace Pathly_Services
 
     namespace Pathly_Services
     {
-        public class AzureModelRouterService : IGroqService
+        public class AzureModelRouterService : IGroqService, IFallbackCareerAiProvider
         {
             private readonly HttpClient _HttpClient;
             private readonly AzureFoundrySettings _FoundrySettings;
@@ -29,6 +29,15 @@ namespace Pathly_Services
             }
 
             public async Task<AiResponseDto> AnalyzeAcademicRecordAsync(ExtractedAcademicRecordDto academicRecord, ApsResultDto apsResult)
+            {
+                return await AnalyzeAcademicRecordAsync(academicRecord, apsResult, null, null);
+            }
+
+            public async Task<AiResponseDto> AnalyzeAcademicRecordAsync(
+                ExtractedAcademicRecordDto academicRecord,
+                ApsResultDto apsResult,
+                List<CareerEvidenceDto>? careerEvidence,
+                PsychometricProfileDto? psychometricProfile)
             {
                 var requestBody = new
                 {
@@ -45,7 +54,7 @@ namespace Pathly_Services
                     new
                     {
                         role = "user",
-                        content = GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult)
+                        content = GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile)
                     }
                 }
                 };

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Pathly_Core;
 using Pathly_Core.Pathly_Core;
 using Pathly_Core.Unit;
+using Pathly_Helper;
 using Pathly_Services;
 using Pathly_Services.Pathly_Services;
 using PathlyInterfaces;
@@ -47,6 +48,7 @@ namespace Pathly_Utility
 
             services.Configure<GroqSettings>(configuratio.GetSection("Groq"));
             services.Configure<AzureFoundrySettings>(configuratio.GetSection("AzureOpenAI"));
+            services.Configure<CareerMatchWeightsOptions>(configuratio.GetSection("CareerMatchWeights"));
 
             //Repository
             services.AddScoped<IAuthenticationRepository, AuthenticationRepository>();
@@ -60,16 +62,27 @@ namespace Pathly_Utility
             services.AddScoped<IApsAnalysisRepositoryInterface, ApsAnalysisRepository>();
             services.AddScoped<ExtractedAcademicRecordInterfaceRepository, ExtractedAcademicRecordRepository>();
             services.AddScoped<IExtractedSubjectInterfaceRepository, ExtractedSubjectRepository>();
+            services.AddScoped<ISubjectRepositoryInterface, SubjectRepository>();
+            services.AddScoped<ICareerProfileRepositoryInterface, CareerProfileRepository>();
+            services.AddScoped<IPsychometricProfileRepositoryInterface, PsychometricProfileRepository>();
 
             //Services
             services.AddScoped<IAuthServiceInterface, AuthenticationService>();
             services.AddScoped<IDocumentExtractionService, DocumentExtractionService>();
             services.AddScoped<ICareerAnalysisService, CareerAnalysisService>();
+            services.AddScoped<IPremiumCareerAnalysisService, PremiumCareerAnalysisService>();
             services.AddScoped<IApsCalculationService, ApsCalculationService>();
+            services.AddScoped<ISubjectKnowledgeService, SubjectKnowledgeService>();
+            services.AddScoped<ICareerEvidenceService, CareerEvidenceService>();
+            services.AddScoped<IBehavioralSignalService, NoOpBehavioralSignalService>();
 
             // Cost-aware AI failover: try Groq first, fall back to Azure Model Router only
             // if Groq fails or returns nothing usable. CareerAnalysisService only ever sees
-            // IGroqService, so it doesn't need to know a fallback exists.
+            // IGroqService, so it doesn't need to know a fallback exists. The primary/fallback
+            // are exposed as interfaces (rather than injecting the concrete classes directly
+            // into ResilientCareerAiService) so the failover logic is unit-testable with fakes.
+            services.AddScoped<IPrimaryCareerAiProvider>(sp => sp.GetRequiredService<GroqService>());
+            services.AddScoped<IFallbackCareerAiProvider>(sp => sp.GetRequiredService<AzureModelRouterService>());
             services.AddScoped<IGroqService, ResilientCareerAiService>();
 
             //Unit of Work
