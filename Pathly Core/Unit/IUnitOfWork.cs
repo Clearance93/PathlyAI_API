@@ -30,6 +30,12 @@ namespace Pathly_Core.Unit
 
         IExtractedSubjectInterfaceRepository ExtractedSubject { get; }
 
+        ISubjectRepositoryInterface Subject { get; }
+
+        ICareerProfileRepositoryInterface CareerProfile { get; }
+
+        IPsychometricProfileRepositoryInterface PsychometricProfile { get; }
+
         Task<int> SaveChangesAsync();
     }
 }

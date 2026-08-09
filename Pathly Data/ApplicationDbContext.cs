@@ -31,5 +31,11 @@ namespace Pathly_Data
         public DbSet<ExtractedAcademicRecord> ExtractedAcademicRecords { get; set; }
 
         public DbSet<ExtractedSubject> ExtractedSubjects { get; set; }
+
+        public DbSet<Subject> Subjects { get; set; }
+
+        public DbSet<PsychometricProfile> PsychometricProfiles { get; set; }
+
+        public DbSet<CareerProfile> CareerProfiles { get; set; }
     }
 }

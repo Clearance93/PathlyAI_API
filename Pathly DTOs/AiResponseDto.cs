@@ -1,4 +1,4 @@
-﻿using Pathly_DTOs;
+using Pathly_DTOs;
 
 public class AiResponseDto
 {
@@ -53,4 +53,17 @@ public class AiResponseDto
     public List<string>? BursariesAvailable { get; set; }
     
     public List<string>? UniversitiestoConsider { get; set; }
+
+    /// <summary>
+    /// Academic-only (Layer 1) reports use this to encourage the learner to complete the
+    /// premium psychometric assessment (Part 8). Left null on premium (Layer 2) reports,
+    /// which already combine both.
+    /// </summary>
+    public string? PsychometricUpsellMessage { get; set; }
+
+    /// <summary>
+    /// The deterministic career evidence (Part 9/10) that grounded this report's career
+    /// recommendations. Populated by Pathly before the AI call, not invented by the AI.
+    /// </summary>
+    public List<CareerEvidenceDto>? CareerEvidence { get; set; }
 }

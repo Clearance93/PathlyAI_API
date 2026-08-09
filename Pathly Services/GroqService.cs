@@ -9,7 +9,7 @@ using System.Text.Json;
 
 namespace Pathly_Services
 {
-    public class GroqService : IGroqService
+    public class GroqService : IGroqService, IPrimaryCareerAiProvider
     {
         private readonly HttpClient _HttpClient;
         private readonly GroqSettings _GroqSettings;
@@ -22,6 +22,15 @@ namespace Pathly_Services
         }
 
         public async Task<AiResponseDto> AnalyzeAcademicRecordAsync(ExtractedAcademicRecordDto academicRecord, ApsResultDto apsResult)
+        {
+            return await AnalyzeAcademicRecordAsync(academicRecord, apsResult, null, null);
+        }
+
+        public async Task<AiResponseDto> AnalyzeAcademicRecordAsync(
+            ExtractedAcademicRecordDto academicRecord,
+            ApsResultDto apsResult,
+            List<CareerEvidenceDto>? careerEvidence,
+            PsychometricProfileDto? psychometricProfile)
         {
             var requestBody = new
             {
@@ -37,7 +46,7 @@ namespace Pathly_Services
                     new
                     {
                         role = "user",
-                        content = GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult)
+                        content = GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile)
                     }
                 }
             };

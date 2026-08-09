@@ -4,6 +4,51 @@ namespace Pathly_Helper
 {
     public static class GroqPromptBuilder
     {
+        /// <summary>
+        /// Bump whenever the prompt template changes materially, so cached results generated
+        /// under an old prompt stop being served automatically (Part 5).
+        /// </summary>
+        public const string PromptVersion = "1.0";
+
+        private static string BuildEvidenceSection(IReadOnlyList<CareerEvidenceDto>? careerEvidence)
+        {
+            if (careerEvidence is null || careerEvidence.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var lines = careerEvidence
+                .OrderByDescending(e => e.OverallScore)
+                .Select(e =>
+                    $"- {e.CareerName} ({e.Category}): AcademicFit={e.AcademicFit}, SubjectAlignment={e.SubjectAlignment}, " +
+                    $"PsychometricFit={(e.PsychometricFit?.ToString() ?? "n/a")}, CareerDemand={e.CareerDemand}, " +
+                    $"FutureGrowth={e.FutureGrowth}, OverallScore={e.OverallScore:0.0}");
+
+            return $@"
+            Pre-computed career evidence (Pathly calculated these deterministically — use them as the
+            basis for top3BestCareers/demandingCareers/alternativeCareers. Do NOT invent career facts,
+            demand levels, or growth outlooks that contradict this evidence. Explain WHY a career is a
+            match by referencing these specific dimensions, e.g. ""strong academic fit and high current
+            demand"" rather than just naming the career):
+            {string.Join("\n            ", lines)}
+";
+        }
+
+        private static string BuildPsychometricSection(PsychometricProfileDto? profile)
+        {
+            if (profile is null)
+            {
+                return string.Empty;
+            }
+
+            return $@"
+            Psychometric profile (RIASEC, 0-100 each) — factor this into career fit alongside the
+            academic evidence above, and explain how the two reinforce or diverge from each other:
+            Realistic={profile.Realistic}, Investigative={profile.Investigative}, Artistic={profile.Artistic},
+            Social={profile.Social}, Enterprising={profile.Enterprising}, Conventional={profile.Conventional}
+";
+        }
+
         public static string BuildSystemPrompt()
         {
             return @"You are PathlyAI, a South African career guidance counsellor with 20 years
@@ -22,7 +67,13 @@ namespace Pathly_Helper
             9. Never return null — use """" or [] instead.
             10. All *Percentage / chances* / *Outlook* / *Availability* fields are numbers 0-100.
             11. improvementtoRoadmap is always an array of strings, never a single string.
-            12. Respond with valid JSON only — no markdown, no commentary, nothing outside the JSON object.";
+            12. Respond with valid JSON only — no markdown, no commentary, nothing outside the JSON object.
+            13. When pre-computed career evidence is provided in the user message, ground your career
+                recommendations and their ""reason""/explanation text in that evidence. Do not contradict it
+                or invent demand/growth figures that aren't supported by it.
+            14. Career guidance is guidance, not a guarantee. Never say a student is ""destined"" or
+                ""guaranteed"" to succeed in a career. Prefer phrasing like ""strong match"", ""promising fit"",
+                ""good academic alignment"", ""worth exploring"", ""lower current alignment"", or ""alternative pathway"".";
         }
 
         private static string FormatSubjectLine(ExtractedSubjectDto s)
@@ -44,6 +95,21 @@ namespace Pathly_Helper
 
         public static string BuildUserPrompt(ExtractedAcademicRecordDto record, ApsResultDto apsResult)
         {
+            return BuildUserPrompt(record, apsResult, null, null);
+        }
+
+        /// <summary>
+        /// Full prompt builder. <paramref name="careerEvidence"/> is the deterministic evidence
+        /// Pathly computed BEFORE calling the AI (Part 9/10/11) — the model is instructed to
+        /// explain this evidence, not invent its own career facts. <paramref name="psychometricProfile"/>
+        /// is only present for premium (Layer 2) analyses.
+        /// </summary>
+        public static string BuildUserPrompt(
+            ExtractedAcademicRecordDto record,
+            ApsResultDto apsResult,
+            IReadOnlyList<CareerEvidenceDto>? careerEvidence,
+            PsychometricProfileDto? psychometricProfile)
+        {
             var subjectSummary = record.Subjects.Any()
                 ? string.Join("\n", record.Subjects.Select(FormatSubjectLine))
                 : "No subjects extracted.";
@@ -52,6 +118,8 @@ namespace Pathly_Helper
             var shouldRewrite = apsResult.TotalAps < 20 ? "true" : "false";
             var shouldUpgrade = apsResult.TotalAps < 30 ? "true" : "false";
             var subjectCount = record.Subjects.Count;
+            var evidenceSection = BuildEvidenceSection(careerEvidence);
+            var psychometricSection = BuildPsychometricSection(psychometricProfile);
 
             return $@"Analyse this specific student. Every field must reference their actual subjects/marks — no generic filler.
 
@@ -62,7 +130,7 @@ namespace Pathly_Helper
             {subjectSummary}
 
             APS Score: {apsResult.TotalAps} | APS Level: {apsResult.QualificationLevel}
-
+            {evidenceSection}{psychometricSection}
             Reference universities (name: minimumAps) — split into qualify/does-not-qualify based on APS {apsResult.TotalAps}:
             University of Pretoria: 30, University of Johannesburg: 28, University of the Witwatersrand: 35,
             University of Cape Town: 36, Stellenbosch University: 35, North-West University: 28, University of KwaZulu-Natal: 30.
