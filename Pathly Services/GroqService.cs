@@ -9,7 +9,7 @@ using System.Text.Json;
 
 namespace Pathly_Services
 {
-    public class GroqService : IGroqService, IPrimaryCareerAiProvider
+    public class GroqService : IGroqService, IPrimaryCareerAiProvider, IDocumentStructuringService
     {
         private readonly HttpClient _HttpClient;
         private readonly GroqSettings _GroqSettings;
@@ -32,6 +32,35 @@ namespace Pathly_Services
             List<CareerEvidenceDto>? careerEvidence,
             PsychometricProfileDto? psychometricProfile)
         {
+            var responseBody = await CallGroqAsync(
+                GroqPromptBuilder.BuildSystemPrompt(),
+                GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile));
+
+            return ParseGroqResponse(responseBody);
+        }
+
+        /// <summary>
+        /// Free replacement for Azure Document Intelligence's layout/field parsing. Takes raw text
+        /// already pulled from the file (via PdfPig or Tesseract OCR — see DocumentExtractionService)
+        /// and asks Groq to reason it into a structured academic record. No Subjects/RawExtractedText
+        /// bookkeeping happens here — that's the caller's responsibility.
+        /// </summary>
+        public async Task<ExtractedAcademicRecordDto> StructureAcademicRecordAsync(string rawText)
+        {
+            if (string.IsNullOrWhiteSpace(rawText))
+            {
+                return new ExtractedAcademicRecordDto { RawExtractedText = rawText };
+            }
+
+            var responseBody = await CallGroqAsync(
+                GroqPromptBuilder.BuildDocumentExtractionSystemPrompt(),
+                GroqPromptBuilder.BuildDocumentExtractionUserPrompt(rawText));
+
+            return ParseExtractionResponse(responseBody);
+        }
+
+        private async Task<string> CallGroqAsync(string systemPrompt, string userPrompt)
+        {
             var requestBody = new
             {
                 model = _GroqSettings.Model,
@@ -41,12 +70,12 @@ namespace Pathly_Services
                     new
                     {
                         role = "system",
-                        content = GroqPromptBuilder.BuildSystemPrompt()
+                        content = systemPrompt
                     },
                     new
                     {
                         role = "user",
-                        content = GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile)
+                        content = userPrompt
                     }
                 }
             };
@@ -69,7 +98,7 @@ namespace Pathly_Services
 
             Console.WriteLine(responseBody);
 
-            return ParseGroqResponse(responseBody);
+            return responseBody;
         }
 
         private static string SanitizeJson(string json)
@@ -117,7 +146,7 @@ namespace Pathly_Services
             return sb.ToString();
         }
 
-        private AiResponseDto ParseGroqResponse(string responseBody)
+        private static string ExtractCleanedJsonContent(string responseBody)
         {
             using var doc = JsonDocument.Parse(responseBody);
 
@@ -151,6 +180,13 @@ namespace Pathly_Services
                     $"Consider increasing max_tokens.");
             }
 
+            return cleaned;
+        }
+
+        private AiResponseDto ParseGroqResponse(string responseBody)
+        {
+            var cleaned = ExtractCleanedJsonContent(responseBody);
+
             var result = JsonSerializer.Deserialize<AiResponseDto>(
                 cleaned,
                 new JsonSerializerOptions
@@ -161,6 +197,68 @@ namespace Pathly_Services
 
             return result ?? throw new InvalidOperationException(
                 "Failed to deserialize Groq response.");
+        }
+
+        private ExtractedAcademicRecordDto ParseExtractionResponse(string responseBody)
+        {
+            var cleaned = ExtractCleanedJsonContent(responseBody);
+
+            var parsed = JsonSerializer.Deserialize<GroqExtractionResponse>(
+                cleaned,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (parsed is null)
+            {
+                throw new InvalidOperationException("Failed to deserialize Groq extraction response.");
+            }
+
+            return new ExtractedAcademicRecordDto
+            {
+                StudentName = NullIfEmpty(parsed.StudentName),
+                InstitutionName = NullIfEmpty(parsed.InstitutionName),
+                InstitutionType = string.IsNullOrWhiteSpace(parsed.InstitutionType) ? "Unknown" : parsed.InstitutionType,
+                StudyLevel = NullIfEmpty(parsed.StudyLevel),
+                AcademicPeriod = NullIfEmpty(parsed.AcademicPeriod),
+                Subjects = (parsed.Subjects ?? new List<GroqExtractedSubject>())
+                    .Where(s => !string.IsNullOrWhiteSpace(s.SubjectName))
+                    .Select(s => new ExtractedSubjectDto
+                    {
+                        ExtractionSubjectId = Guid.NewGuid(),
+                        SubjectName = s.SubjectName!.Trim(),
+                        RawMark = NullIfEmpty(s.RawMark),
+                        NumericMark = s.NumericMark,
+                        Symbol = NullIfEmpty(s.Symbol),
+                        MarkType = string.IsNullOrWhiteSpace(s.MarkType) ? "Symbol" : s.MarkType
+                    })
+                    .ToList()
+            };
+        }
+
+        private static string? NullIfEmpty(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+        /// <summary>
+        /// Mirrors the shape of the JSON schema requested in
+        /// <see cref="GroqPromptBuilder.BuildDocumentExtractionUserPrompt"/>. Kept private/internal —
+        /// this is purely a deserialization shim, never exposed outside GroqService.
+        /// </summary>
+        private class GroqExtractionResponse
+        {
+            public string? StudentName { get; set; }
+            public string? InstitutionName { get; set; }
+            public string? InstitutionType { get; set; }
+            public string? StudyLevel { get; set; }
+            public string? AcademicPeriod { get; set; }
+            public List<GroqExtractedSubject>? Subjects { get; set; }
+        }
+
+        private class GroqExtractedSubject
+        {
+            public string? SubjectName { get; set; }
+            public string? RawMark { get; set; }
+            public int? NumericMark { get; set; }
+            public string? Symbol { get; set; }
+            public string? MarkType { get; set; }
         }
     }
 }
