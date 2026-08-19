@@ -99,6 +99,72 @@ namespace Pathly_Helper
         }
 
         /// <summary>
+        /// Bump whenever the extraction prompt template changes materially — mirrors
+        /// <see cref="PromptVersion"/> but scoped to the document-structuring step so the two
+        /// can evolve independently.
+        /// </summary>
+        public const string ExtractionPromptVersion = "1.0";
+
+        public static string BuildDocumentExtractionSystemPrompt()
+        {
+            return @"You are a precise document-structuring engine for South African academic
+            transcripts (NSC/matric report cards, TVET N-course results, Cambridge IGCSE/AS/A-Level
+            statements of results, and university transcripts). You are given raw text pulled from a
+            PDF or OCR scan — it may have inconsistent spacing, merged words, or jumbled column order.
+            Your only job is to find the real data in it and return it as clean structured JSON.
+
+            RULES:
+            1. Never invent subjects, marks, names, or institutions that are not actually present in
+               the text. If a field cannot be found, use null — never guess or fabricate.
+            2. subjects: one entry per subject/course line item that has an associated mark or grade.
+               Skip header rows, totals, and rows with no subject name.
+            3. markType classification per subject:
+               - ""Percentage"": a real percentage, or a ""marks obtained / max marks"" pair (normalize
+                 to a 0-100 numericMark by dividing and multiplying by 100, rounded to the nearest whole
+                 number; if marks are already out of 100, use them directly).
+               - ""GradeEquivalent"": ONLY for Cambridge-style single-letter grades with no numeric score
+                 alongside them. Map the letter using this exact table for numericMark:
+                 A*=90, A=80, B=70, C=60, D=50, E=40, U=0. Keep the original letter in ""symbol"" and
+                 ""rawMark"".
+               - ""Symbol"": anything else that can't be resolved to a number (e.g. ""Not achieved"",
+                 competency-only outcomes). numericMark is null in this case.
+            4. studentName: from labels like ""Student Name"", ""Learner Name"", ""Candidate Name"", ""Name"".
+            5. institutionName: from labels like ""School"", ""Institution"", ""University"", ""College"", ""TVET"".
+            6. studyLevel: look for patterns like ""Grade 8-12"", ""N2""-""N6"", ""NCV Level 2-4"", ""1st/2nd/3rd/4th
+               year"", ""Semester 1/2"", ""Year 1/2/3"".
+            7. institutionType, inferred strictly from studyLevel: ""Grade ..."" -> ""High School"";
+               ""N2""-""N6"" or ""NCV"" -> ""TVET College""; ""Year ..."" or ""Semester ..."" -> ""University"";
+               otherwise -> ""Unknown"".
+            8. academicPeriod: the exam year or period if stated (e.g. ""2025"", ""June 2025""), else null.
+            9. Respond with valid JSON only — no markdown fences, no commentary, nothing outside the
+               JSON object.";
+        }
+
+        public static string BuildDocumentExtractionUserPrompt(string rawText)
+        {
+            return $@"Extract the structured academic record from this raw transcript text.
+
+            RAW TEXT:
+            ---
+            {rawText}
+            ---
+
+            Return ONLY this JSON structure:
+
+            {{
+              ""studentName"": ""string or null"",
+              ""institutionName"": ""string or null"",
+              ""institutionType"": ""High School | TVET College | University | Unknown"",
+              ""studyLevel"": ""string or null"",
+              ""academicPeriod"": ""string or null"",
+              ""subjects"": [
+                {{ ""subjectName"": ""exact subject name as it appears"", ""rawMark"": ""the mark/grade text as it appeared"", ""numericMark"": 0, ""symbol"": ""letter grade or null"", ""markType"": ""Percentage | GradeEquivalent | Symbol"" }}
+                /* one object per real subject line item found — do not pad, do not invent */
+              ]
+            }}";
+        }
+
+        /// <summary>
         /// Full prompt builder. <paramref name="careerEvidence"/> is the deterministic evidence
         /// Pathly computed BEFORE calling the AI (Part 9/10/11) — the model is instructed to
         /// explain this evidence, not invent its own career facts. <paramref name="psychometricProfile"/>
