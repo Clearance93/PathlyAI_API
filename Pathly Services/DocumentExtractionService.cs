@@ -22,10 +22,6 @@ namespace Pathly_Services
             ["School"] = new[] { "School", "Institution", "University", "College", "TVET" },
         };
 
-        // Cambridge Statements of Results (IGCSE / AS & A Level) only ever publish a letter
-        // grade — no raw marks or percentage. This is NOT Cambridge's official UMS conversion;
-        // it's an internal estimate so grade-only results can still flow through the same
-        // numeric APS pipeline as percentage-based (NSC/TVET) results.
         private static readonly Dictionary<string, int> CambridgeGradeToPercentage = new(StringComparer.OrdinalIgnoreCase)
         {
             ["A*"] = 90,
@@ -37,7 +33,9 @@ namespace Pathly_Services
             ["U"] = 0,
         };
 
-        public DocumentExtractionService(IConfiguration config)
+        public DocumentExtractionService(IConfiguration config,
+                                         IUnitOfWork unit,
+                                         IMapper mapper)
         {
             var endpoint = config["AzureDocumentIntelligence:Endpoint"]
                 ?? throw new InvalidOperationException("AzureDocumentIntelligence:Endpoint is not configured.");
@@ -53,8 +51,7 @@ namespace Pathly_Services
         {
             var fileBytes = Convert.FromBase64String(base64File);
 
-            var operation = await _Client.AnalyzeDocumentAsync(
-                WaitUntil.Completed, "prebuilt-layout", BinaryData.FromBytes(fileBytes));
+            var operation = await _Client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-layout", BinaryData.FromBytes(fileBytes));
 
             var result = operation.Value;
 
@@ -120,7 +117,6 @@ namespace Pathly_Services
 
                 subjects.Add(new ExtractedSubjectDto
                 {
-                    ExtractionSubjectId = Guid.NewGuid(),
                     SubjectName = subjectName,
                     RawMark = rawMarkSource ?? gradeRaw,
                     NumericMark = numericMark,
@@ -128,9 +124,14 @@ namespace Pathly_Services
                     MarkType = markType
                 });
 
-                var addSubject = _mapper.Map<ExtractedSubject>(subjects);
+                var addSubjects = _mapper.Map<List<ExtractedSubject>>(subjects);
 
-                await _unit.SubjectExtraction.AddAsync(addSubject);
+                foreach (var subject in addSubjects)
+                {
+                    subject.ExtractionSubjectId = Guid.NewGuid();
+
+                    await _unit.SubjectExtraction.AddAsync(subject);
+                }
             }
 
             await _unit.SaveChangesAsync();
