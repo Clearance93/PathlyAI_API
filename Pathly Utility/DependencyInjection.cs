@@ -76,14 +76,13 @@ namespace Pathly_Utility
             services.AddScoped<ICareerEvidenceService, CareerEvidenceService>();
             services.AddScoped<IBehavioralSignalService, NoOpBehavioralSignalService>();
 
-            // Cost-aware AI failover: try Groq first, fall back to Azure Model Router only
-            // if Groq fails or returns nothing usable. CareerAnalysisService only ever sees
-            // IGroqService, so it doesn't need to know a fallback exists. The primary/fallback
-            // are exposed as interfaces (rather than injecting the concrete classes directly
-            // into ResilientCareerAiService) so the failover logic is unit-testable with fakes.
+            // Groq-only for now (Azure AI Foundry temporarily disabled — everything Azure-related
+            // is left in place below, untouched, so this is a one-line flip back to
+            // ResilientCareerAiService whenever Azure is wanted again).
             services.AddScoped<IPrimaryCareerAiProvider>(sp => sp.GetRequiredService<GroqService>());
             services.AddScoped<IFallbackCareerAiProvider>(sp => sp.GetRequiredService<AzureModelRouterService>());
-            services.AddScoped<IGroqService, ResilientCareerAiService>();
+            services.AddScoped<IGroqService>(sp => sp.GetRequiredService<GroqService>());
+            // services.AddScoped<IGroqService, ResilientCareerAiService>(); // <- re-enable Azure fallback by swapping to this line
 
             // Document extraction structuring: Groq only, by design (Part: free document
             // extraction). No Azure fallback here — unlike career analysis, this step is cheap
