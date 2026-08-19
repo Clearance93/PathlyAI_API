@@ -34,7 +34,8 @@ namespace Pathly_Services
         {
             var responseBody = await CallGroqAsync(
                 GroqPromptBuilder.BuildSystemPrompt(),
-                GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile));
+                GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile),
+                maxTokens: 8000);
 
             return ParseGroqResponse(responseBody);
         }
@@ -52,19 +53,44 @@ namespace Pathly_Services
                 return new ExtractedAcademicRecordDto { RawExtractedText = rawText };
             }
 
-            var responseBody = await CallGroqAsync(
-                GroqPromptBuilder.BuildDocumentExtractionSystemPrompt(),
-                GroqPromptBuilder.BuildDocumentExtractionUserPrompt(rawText));
+            var systemPrompt = GroqPromptBuilder.BuildDocumentExtractionSystemPrompt();
+            var userPrompt = GroqPromptBuilder.BuildDocumentExtractionUserPrompt(rawText);
+
+            var responseBody = await CallGroqAsync(systemPrompt, userPrompt, EstimateExtractionMaxTokens(systemPrompt, userPrompt));
 
             return ParseExtractionResponse(responseBody);
         }
 
-        private async Task<string> CallGroqAsync(string systemPrompt, string userPrompt)
+        // Groq's free/on_demand tier enforces a tokens-per-minute cap covering prompt +
+        // requested completion combined (8000 TPM at time of writing for openai/gpt-oss-120b). A
+        // flat completion budget either wastes headroom on short transcripts or risks truncating
+        // long ones (a 60+ module university transcript can genuinely need 2500+ completion
+        // tokens of JSON), so this scales the request instead:
+        //   1. Roughly estimate prompt tokens (~4 characters per token is a standard approximation
+        //      for English text and holds up fine for a size estimate, not exact billing).
+        //   2. Leave a safety margin so we don't shave the request right up to the TPM ceiling.
+        //   3. Clamp between a floor (small records still get enough room) and a ceiling (very
+        //      large documents can't just take an unbounded completion budget — see the
+        //      NeedsManualReview + rechunking note in DocumentExtractionService for that case).
+        private const int TokensPerMinuteBudget = 8000;
+        private const int SafetyMarginTokens = 300;
+        private const int MinExtractionTokens = 1200;
+        private const int MaxExtractionTokens = 4000;
+
+        private static int EstimateExtractionMaxTokens(string systemPrompt, string userPrompt)
+        {
+            var estimatedPromptTokens = (systemPrompt.Length + userPrompt.Length) / 4;
+            var available = TokensPerMinuteBudget - estimatedPromptTokens - SafetyMarginTokens;
+
+            return Math.Clamp(available, MinExtractionTokens, MaxExtractionTokens);
+        }
+
+        private async Task<string> CallGroqAsync(string systemPrompt, string userPrompt, int maxTokens)
         {
             var requestBody = new
             {
                 model = _GroqSettings.Model,
-                max_tokens = 8000,
+                max_tokens = maxTokens,
                 messages = new[]
                 {
                     new

@@ -32,12 +32,34 @@ namespace Pathly_Services
 
         public async Task<ExtractedAcademicRecordDto> StructureAcademicRecordAsync(string rawText)
         {
-            ExtractedAcademicRecordDto lastAttempt = new();
+            ExtractedAcademicRecordDto? lastAttempt = null;
             ExtractionValidationResult lastValidation = new();
+            var lastFailureReason = "Unknown extraction failure.";
 
             for (var attempt = 1; attempt <= _maxAttempts; attempt++)
             {
-                lastAttempt = await _inner.StructureAcademicRecordAsync(rawText);
+                try
+                {
+                    lastAttempt = await _inner.StructureAcademicRecordAsync(rawText);
+                }
+                catch (Exception ex)
+                {
+                    // A thrown exception here (rate limit, truncated response, transient network
+                    // failure) used to crash the whole upload on the very first attempt, with no
+                    // chance to retry. Treat it the same as a failed validation instead: log it,
+                    // back off briefly, and try again rather than failing the request outright.
+                    lastFailureReason = ex.Message;
+
+                    Console.WriteLine($"Extraction attempt {attempt}/{_maxAttempts} threw: {ex.Message}");
+
+                    if (attempt < _maxAttempts)
+                    {
+                        await Task.Delay(TimeSpan.FromMilliseconds(400 * attempt));
+                    }
+
+                    continue;
+                }
+
                 lastValidation = ExtractionValidator.Validate(rawText, lastAttempt);
 
                 if (lastValidation.IsValid)
@@ -48,19 +70,23 @@ namespace Pathly_Services
                     return lastAttempt;
                 }
 
-                Console.WriteLine(
-                    $"Extraction attempt {attempt}/{_maxAttempts} failed validation: " +
-                    string.Join("; ", lastValidation.Errors));
+                lastFailureReason = string.Join("; ", lastValidation.Errors);
+
+                Console.WriteLine($"Extraction attempt {attempt}/{_maxAttempts} failed validation: {lastFailureReason}");
             }
 
-            // Exhausted retries — hand back the last attempt rather than failing the whole
-            // upload, but make the uncertainty explicit so it isn't trusted silently.
-            lastAttempt.NeedsManualReview = true;
-            lastAttempt.ExtractionWarnings = lastValidation.Errors
-                .Concat(lastValidation.Warnings)
-                .ToList();
+            // Exhausted retries — hand back the best available result rather than failing the
+            // whole upload, but make the uncertainty explicit so it isn't trusted silently. If
+            // every attempt threw (no successful structuring at all), fall back to an empty
+            // record so the caller still gets a well-formed DTO instead of an exception.
+            var result = lastAttempt ?? new ExtractedAcademicRecordDto();
 
-            return lastAttempt;
+            result.NeedsManualReview = true;
+            result.ExtractionWarnings = lastValidation.IsValid
+                ? new List<string> { lastFailureReason }
+                : lastValidation.Errors.Concat(lastValidation.Warnings).ToList();
+
+            return result;
         }
     }
 }
