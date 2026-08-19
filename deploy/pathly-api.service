@@ -1,0 +1,19 @@
+[Unit]
+Description=PathlyAI ASP.NET Core API
+After=network.target
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/pathly-api/publish
+ExecStart=/usr/bin/dotnet /opt/pathly-api/publish/PathlyAI_API.dll
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=pathly-api
+User=www-data
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://+:8080
+Environment=DOTNET_ROOT=/usr/share/dotnet
+
+[Install]
+WantedBy=multi-user.target

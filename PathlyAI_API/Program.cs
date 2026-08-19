@@ -1,15 +1,40 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Pathly_Data;
 using Pathly_Models;
 using Pathly_Utility;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Key"]))
+{
+    throw new InvalidOperationException(
+        "The JWT signing key is not configured. Set 'Jwt:Key' via user secrets in development " +
+        "or the 'Jwt__Key' environment variable in production.");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("PathlyConnection"));
+    var connectionString = builder.Configuration.GetConnectionString("PathlyConnection");
+    if (!string.IsNullOrEmpty(connectionString) && IsPostgreSqlConnectionString(connectionString))
+    {
+        options.UseNpgsql(connectionString);
+    }
+    else
+    {
+        options.UseSqlServer(connectionString!);
+    }
 });
+
+static bool IsPostgreSqlConnectionString(string connectionString)
+{
+    return connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+           connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase) ||
+           connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase) && connectionString.Contains("Database=", StringComparison.OrdinalIgnoreCase);
+}
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
@@ -30,26 +55,89 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 
 builder.Services.AddApplicationDependacy(builder.Configuration);
 
+builder.Services
+    .AddAuthentication(options =>
+    {
+        // AddIdentity() defaults these to its cookie scheme, which would make every
+        // [Authorize] endpoint redirect to /Account/Login instead of honouring Bearer
+        // tokens — so they must be explicitly pointed at JWT for the API.
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        var jwtKey = builder.Configuration["Jwt:Key"];
+        var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+        var jwtAudience = builder.Configuration["Jwt:Audience"];
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!)),
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAllOrigins",
-        builder =>
+    options.AddPolicy("AllowedOrigins", policy =>
+    {
+        var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
+        if (origins.Length > 0)
         {
-            builder.AllowAnyOrigin()
-                   .AllowAnyMethod()
-                   .AllowAnyHeader();
-        });
+            policy.WithOrigins(origins);
+        }
+
+        policy.AllowAnyMethod()
+              .AllowAnyHeader();
+    });
 });
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+using (var scope = app.Services.CreateScope())
+{
+    var seederLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        await PlanSeeder.SeedAsync(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(), seederLogger);
+    }
+    catch (Exception ex)
+    {
+        seederLogger.LogError(ex, "Failed to seed the plan catalogue.");
+    }
+}
+
+app.UseExceptionHandler(exceptionHandlerApp =>
+{
+    exceptionHandlerApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            error = "server_error",
+            message = "An unexpected error occurred. Please try again later."
+        });
+    });
+});
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -57,7 +145,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseCors("AllowAllOrigins"); 
+app.UseCors("AllowedOrigins");
+
+app.UseAuthentication();
 
 app.UseAuthorization();
 

@@ -4,11 +4,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Pathly_Core;
-using Pathly_Core.Pathly_Core;
 using Pathly_Core.Unit;
 using Pathly_Helper;
 using Pathly_Services;
-using Pathly_Services.Pathly_Services;
 using PathlyInterfaces;
 using PathlyInterfaces.IService;
 using PathlyRepository;
@@ -49,6 +47,11 @@ namespace Pathly_Utility
             services.Configure<GroqSettings>(configuratio.GetSection("Groq"));
             services.Configure<AzureFoundrySettings>(configuratio.GetSection("AzureOpenAI"));
             services.Configure<CareerMatchWeightsOptions>(configuratio.GetSection("CareerMatchWeights"));
+            services.Configure<PaystackSettings>(configuratio.GetSection("Paystack"));
+
+            services.AddHttpClient<PaystackGateway>();
+            services.AddScoped<IPaymentGatewayInterface>(sp => sp.GetRequiredService<PaystackGateway>());
+            services.AddScoped<IBillingServiceInterface, BillingService>();
 
             //Repository
             services.AddScoped<IAuthenticationRepository, AuthenticationRepository>();
@@ -65,6 +68,12 @@ namespace Pathly_Utility
             services.AddScoped<ISubjectRepositoryInterface, SubjectRepository>();
             services.AddScoped<ICareerProfileRepositoryInterface, CareerProfileRepository>();
             services.AddScoped<IPsychometricProfileRepositoryInterface, PsychometricProfileRepository>();
+            services.AddScoped<IPsychometricAssessmentRepositoryInterface, PsychometricAssessmentRepository>();
+            services.AddScoped<IPlanRepositoryInterface, PlanRepository>();
+            services.AddScoped<IUserSubscriptionRepositoryInterface, UserSubscriptionRepository>();
+            services.AddScoped<IPaymentTransactionRepositoryInterface, PaymentTransactionRepository>();
+            services.AddScoped<IUsageTransactionRepositoryInterface, UsageTransactionRepository>();
+            services.AddScoped<ICreditTransactionRepositoryInterface, CreditTransactionRepository>();
 
             //Services
             services.AddScoped<IAuthServiceInterface, AuthenticationService>();
@@ -75,15 +84,14 @@ namespace Pathly_Utility
             services.AddScoped<ISubjectKnowledgeService, SubjectKnowledgeService>();
             services.AddScoped<ICareerEvidenceService, CareerEvidenceService>();
             services.AddScoped<IBehavioralSignalService, NoOpBehavioralSignalService>();
+            services.AddScoped<IPsychometricService, PsychometricService>();
 
-            // Cost-aware AI failover: try Groq first, fall back to Azure Model Router only
-            // if Groq fails or returns nothing usable. CareerAnalysisService only ever sees
-            // IGroqService, so it doesn't need to know a fallback exists. The primary/fallback
-            // are exposed as interfaces (rather than injecting the concrete classes directly
-            // into ResilientCareerAiService) so the failover logic is unit-testable with fakes.
+            // Groq-only for now (Azure AI Foundry temporarily disabled — everything Azure-related
+            // is left in place below, untouched, so this is a one-line flip back to
+            // ResilientCareerAiService whenever Azure is wanted again).
             services.AddScoped<IPrimaryCareerAiProvider>(sp => sp.GetRequiredService<GroqService>());
             services.AddScoped<IFallbackCareerAiProvider>(sp => sp.GetRequiredService<AzureModelRouterService>());
-            services.AddScoped<IGroqService, ResilientCareerAiService>();
+            services.AddScoped<IGroqService>(sp => sp.GetRequiredService<GroqService>());
 
             // Document extraction structuring: Groq only, by design (Part: free document
             // extraction). No Azure fallback here — unlike career analysis, this step is cheap
@@ -91,7 +99,9 @@ namespace Pathly_Utility
             // paid fallback provider. Wrapped in self-validation/retry so a hallucinated or
             // incomplete extraction gets a second (and third) attempt before it's trusted.
             services.AddScoped<IDocumentStructuringService>(sp =>
-                new SelfValidatingDocumentStructuringService(sp.GetRequiredService<GroqService>()));
+                new SelfValidatingDocumentStructuringService(
+                    sp.GetRequiredService<GroqService>(),
+                    logger: sp.GetRequiredService<ILogger<SelfValidatingDocumentStructuringService>>()));
 
             //Unit of Work
             services.AddScoped<IUnitOfWork, UnitOfWork>();

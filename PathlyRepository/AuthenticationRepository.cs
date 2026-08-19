@@ -18,5 +18,15 @@ namespace PathlyRepository
         {
             return await _Context.Users.FirstOrDefaultAsync(u => u.Email == email);
         }
+
+        public async Task<ApplicationUser?> GetByUserIdAsync(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return null;
+            }
+
+            return await _Context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        }
     }
 }

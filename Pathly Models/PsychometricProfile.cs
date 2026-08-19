@@ -11,6 +11,14 @@ namespace Pathly_Models
         [Key]
         public Guid PsychometricProfileId { get; set; }
 
+        /// <summary>
+        /// The logged-in learner (ApplicationUser.Id) who completed the assessment that produced
+        /// this profile. Null only for legacy rows created before user linkage existed.
+        /// </summary>
+        public string? ApplicationUserId { get; set; }
+
+        public ApplicationUser? ApplicationUser { get; set; }
+
         public int Realistic { get; set; }
 
         public int Investigative { get; set; }

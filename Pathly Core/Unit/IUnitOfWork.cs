@@ -26,8 +26,6 @@ namespace Pathly_Core.Unit
 
         IAuthenticationRepository User { get; }
 
-        //ExtractedAcademicRecordInterfaceRepository ExtractedAcademicRecord { get; }
-
         IExtractedSubjectInterfaceRepository ExtractedSubject { get; }
 
         ISubjectRepositoryInterface Subject { get; }
@@ -35,6 +33,18 @@ namespace Pathly_Core.Unit
         ICareerProfileRepositoryInterface CareerProfile { get; }
 
         IPsychometricProfileRepositoryInterface PsychometricProfile { get; }
+
+        IPsychometricAssessmentRepositoryInterface PsychometricAssessment { get; }
+
+        IPlanRepositoryInterface Plan { get; }
+
+        IUserSubscriptionRepositoryInterface UserSubscription { get; }
+
+        IPaymentTransactionRepositoryInterface PaymentTransaction { get; }
+
+        IUsageTransactionRepositoryInterface UsageTransaction { get; }
+
+        ICreditTransactionRepositoryInterface CreditTransaction { get; }
 
         Task<int> SaveChangesAsync();
     }

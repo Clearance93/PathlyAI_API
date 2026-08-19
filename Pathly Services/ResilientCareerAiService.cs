@@ -1,4 +1,6 @@
-﻿using Pathly_DTOs;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Pathly_DTOs;
 using Pathly_Helper;
 using PathlyInterfaces.IService;
 
@@ -17,11 +19,15 @@ namespace Pathly_Services
     {
         private readonly IPrimaryCareerAiProvider _Primary;
         private readonly IFallbackCareerAiProvider _Fallback;
+        private readonly ILogger<ResilientCareerAiService> _Logger;
 
-        public ResilientCareerAiService(IPrimaryCareerAiProvider primary, IFallbackCareerAiProvider fallback)
+        public ResilientCareerAiService(IPrimaryCareerAiProvider primary,
+                                        IFallbackCareerAiProvider fallback,
+                                        ILogger<ResilientCareerAiService>? logger = null)
         {
             _Primary = primary ?? throw new ArgumentNullException(nameof(primary));
             _Fallback = fallback ?? throw new ArgumentNullException(nameof(fallback));
+            _Logger = logger ?? NullLogger<ResilientCareerAiService>.Instance;
         }
 
         public async Task<AiResponseDto> AnalyzeAcademicRecordAsync(ExtractedAcademicRecordDto academicRecord, ApsResultDto apsResult)
@@ -46,14 +52,13 @@ namespace Pathly_Services
                     return response;
                 }
 
-                Console.WriteLine("Groq returned an empty/unusable response. Falling back to Azure Model Router.");
+                _Logger.LogWarning("Groq returned an empty/unusable response. Falling back to Azure Model Router.");
             }
             catch (Exception ex)
             {
                 primaryFailure = ex;
-                Console.WriteLine($"Groq call failed ({ex.GetType().Name}: {ex.Message}). Falling back to Azure Model Router.");
+                _Logger.LogWarning(ex, "Groq call failed ({ExceptionType}: {Message}). Falling back to Azure Model Router.", ex.GetType().Name, ex.Message);
             }
-
             try
             {
                 var fallbackResponse = await _Fallback.AnalyzeAcademicRecordAsync(academicRecord, apsResult, careerEvidence, psychometricProfile);

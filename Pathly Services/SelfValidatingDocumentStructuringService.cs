@@ -1,4 +1,6 @@
-﻿using Pathly_DTOs;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Pathly_DTOs;
 using Pathly_Helper;
 using PathlyInterfaces.IService;
 
@@ -17,8 +19,11 @@ namespace Pathly_Services
     {
         private readonly IDocumentStructuringService _inner;
         private readonly int _maxAttempts;
+        private readonly ILogger<SelfValidatingDocumentStructuringService> _logger;
 
-        public SelfValidatingDocumentStructuringService(IDocumentStructuringService inner, int maxAttempts = 3)
+        public SelfValidatingDocumentStructuringService(IDocumentStructuringService inner,
+                                                        int maxAttempts = 3,
+                                                        ILogger<SelfValidatingDocumentStructuringService>? logger = null)
         {
             _inner = inner ?? throw new ArgumentNullException(nameof(inner));
 
@@ -28,6 +33,7 @@ namespace Pathly_Services
             }
 
             _maxAttempts = maxAttempts;
+            _logger = logger ?? NullLogger<SelfValidatingDocumentStructuringService>.Instance;
         }
 
         public async Task<ExtractedAcademicRecordDto> StructureAcademicRecordAsync(string rawText)
@@ -50,7 +56,7 @@ namespace Pathly_Services
                     // back off briefly, and try again rather than failing the request outright.
                     lastFailureReason = ex.Message;
 
-                    Console.WriteLine($"Extraction attempt {attempt}/{_maxAttempts} threw: {ex.Message}");
+                    _logger.LogWarning(ex, "Extraction attempt {Attempt}/{MaxAttempts} threw.", attempt, _maxAttempts);
 
                     if (attempt < _maxAttempts)
                     {
@@ -72,7 +78,7 @@ namespace Pathly_Services
 
                 lastFailureReason = string.Join("; ", lastValidation.Errors);
 
-                Console.WriteLine($"Extraction attempt {attempt}/{_maxAttempts} failed validation: {lastFailureReason}");
+                _logger.LogWarning("Extraction attempt {Attempt}/{MaxAttempts} failed validation: {FailureReason}", attempt, _maxAttempts, lastFailureReason);
             }
 
             // Exhausted retries — hand back the best available result rather than failing the

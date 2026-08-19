@@ -35,7 +35,19 @@ namespace Pathly_Core.Unit
 
         public IPsychometricProfileRepositoryInterface PsychometricProfile { get; private set; }
 
+        public IPsychometricAssessmentRepositoryInterface PsychometricAssessment { get; private set; }
+
         public IExtractedSubjectInterfaceRepository SubjectExtraction { get; private set; }
+
+        public IPlanRepositoryInterface Plan { get; private set; }
+
+        public IUserSubscriptionRepositoryInterface UserSubscription { get; private set; }
+
+        public IPaymentTransactionRepositoryInterface PaymentTransaction { get; private set; }
+
+        public IUsageTransactionRepositoryInterface UsageTransaction { get; private set; }
+
+        public ICreditTransactionRepositoryInterface CreditTransaction { get; private set; }
 
         public UnitOfWork(ApplicationDbContext context,
                           IAcademicRecordRepositoryInterface academicRecord,
@@ -52,7 +64,13 @@ namespace Pathly_Core.Unit
                           ISubjectRepositoryInterface subject,
                           ICareerProfileRepositoryInterface careerProfile,
                           IPsychometricProfileRepositoryInterface psychometricProfile,
-                          IExtractedSubjectInterfaceRepository subjectExtraction)
+                          IPsychometricAssessmentRepositoryInterface psychometricAssessment,
+                          IExtractedSubjectInterfaceRepository subjectExtraction,
+                          IPlanRepositoryInterface plan,
+                          IUserSubscriptionRepositoryInterface userSubscription,
+                          IPaymentTransactionRepositoryInterface paymentTransaction,
+                          IUsageTransactionRepositoryInterface usageTransaction,
+                          ICreditTransactionRepositoryInterface creditTransaction)
         {
             _Context = context;
             AcademicRecord = academicRecord ?? throw new ArgumentNullException(nameof(academicRecord));
@@ -69,7 +87,13 @@ namespace Pathly_Core.Unit
             Subject = subject ?? throw new ArgumentNullException(nameof(subject));
             CareerProfile = careerProfile ?? throw new ArgumentNullException(nameof(careerProfile));
             PsychometricProfile = psychometricProfile ?? throw new ArgumentNullException(nameof(psychometricProfile));
+            PsychometricAssessment = psychometricAssessment ?? throw new ArgumentNullException(nameof(psychometricAssessment));
             SubjectExtraction = subjectExtraction ?? throw new ArgumentNullException(nameof(subjectExtraction));
+            Plan = plan ?? throw new ArgumentNullException(nameof(plan));
+            UserSubscription = userSubscription ?? throw new ArgumentNullException(nameof(userSubscription));
+            PaymentTransaction = paymentTransaction ?? throw new ArgumentNullException(nameof(paymentTransaction));
+            UsageTransaction = usageTransaction ?? throw new ArgumentNullException(nameof(usageTransaction));
+            CreditTransaction = creditTransaction ?? throw new ArgumentNullException(nameof(creditTransaction));
         }
 
         public void Dispose()
