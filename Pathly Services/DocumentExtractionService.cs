@@ -48,7 +48,9 @@ namespace Pathly_Services
                     "PDF with no text layer, please upload it as a JPG/PNG image instead so OCR can run on it.");
             }
 
-            var record = await _structuringService.StructureAcademicRecordAsync(rawText);
+            var compactedText = CompactText(rawText);
+
+            var record = await _structuringService.StructureAcademicRecordAsync(compactedText);
 
             record.ExtractionAcademicRecordId = Guid.NewGuid();
             record.RawExtractedText = rawText;
@@ -57,6 +59,40 @@ namespace Pathly_Services
             await PersistSubjectsAsync(record.Subjects);
 
             return record;
+        }
+
+        /// <summary>
+        /// Strips blank-line padding left over from per-page extraction (PdfTextExtractor writes
+        /// a blank line between every page) before the text goes to Groq. This is pure token-count
+        /// hygiene — Groq's free tier caps prompt + completion tokens per minute combined, so
+        /// cutting dead whitespace directly widens how large a document can be processed without
+        /// hitting that limit. Nothing semantically meaningful is removed; the full original text
+        /// is still preserved on <see cref="ExtractedAcademicRecordDto.RawExtractedText"/>.
+        /// </summary>
+        private static string CompactText(string rawText)
+        {
+            var lines = rawText
+                .Replace("\r\n", "\n")
+                .Split('\n')
+                .Select(line => line.TrimEnd());
+
+            var compacted = new List<string>();
+            var previousWasBlank = false;
+
+            foreach (var line in lines)
+            {
+                var isBlank = string.IsNullOrWhiteSpace(line);
+
+                if (isBlank && previousWasBlank)
+                {
+                    continue;
+                }
+
+                compacted.Add(line);
+                previousWasBlank = isBlank;
+            }
+
+            return string.Join("\n", compacted).Trim();
         }
 
         private static string ExtractRawText(byte[] fileBytes, string mimeType, string? fileName)

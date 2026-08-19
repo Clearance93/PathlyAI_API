@@ -34,7 +34,8 @@ namespace Pathly_Services
         {
             var responseBody = await CallGroqAsync(
                 GroqPromptBuilder.BuildSystemPrompt(),
-                GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile));
+                GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile),
+                maxTokens: 8000);
 
             return ParseGroqResponse(responseBody);
         }
@@ -52,19 +53,26 @@ namespace Pathly_Services
                 return new ExtractedAcademicRecordDto { RawExtractedText = rawText };
             }
 
+            // Groq's free/on_demand tier enforces a tokens-per-minute cap that covers prompt +
+            // requested completion combined (8000 TPM at time of writing for openai/gpt-oss-120b).
+            // An extracted JSON record is small — a few hundred tokens even for a long university
+            // transcript — so this stays well within budget without risking truncation.
+            const int extractionMaxTokens = 2000;
+
             var responseBody = await CallGroqAsync(
                 GroqPromptBuilder.BuildDocumentExtractionSystemPrompt(),
-                GroqPromptBuilder.BuildDocumentExtractionUserPrompt(rawText));
+                GroqPromptBuilder.BuildDocumentExtractionUserPrompt(rawText),
+                extractionMaxTokens);
 
             return ParseExtractionResponse(responseBody);
         }
 
-        private async Task<string> CallGroqAsync(string systemPrompt, string userPrompt)
+        private async Task<string> CallGroqAsync(string systemPrompt, string userPrompt, int maxTokens)
         {
             var requestBody = new
             {
                 model = _GroqSettings.Model,
-                max_tokens = 8000,
+                max_tokens = maxTokens,
                 messages = new[]
                 {
                     new
