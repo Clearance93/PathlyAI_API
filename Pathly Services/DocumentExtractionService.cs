@@ -48,15 +48,81 @@ namespace Pathly_Services
                     "PDF with no text layer, please upload it as a JPG/PNG image instead so OCR can run on it.");
             }
 
-            var record = await _structuringService.StructureAcademicRecordAsync(rawText);
+            var compactedText = CompactText(rawText);
+            var (textToSend, wasTruncated) = EnforceMaxInputSize(compactedText);
+
+            var record = await _structuringService.StructureAcademicRecordAsync(textToSend);
 
             record.ExtractionAcademicRecordId = Guid.NewGuid();
             record.RawExtractedText = rawText;
             record.ExtractedAt = DateTime.Now;
 
+            if (wasTruncated)
+            {
+                // Groq's free tier caps prompt + completion tokens together per minute, so a very
+                // long document (e.g. a multi-year university transcript) can't always be sent in
+                // full. Rather than silently dropping the tail of the document, flag it explicitly
+                // so the person — or a future chunked-extraction pass — knows to double-check.
+                record.NeedsManualReview = true;
+                record.ExtractionWarnings.Add(
+                    "The document was long enough that part of it had to be trimmed before " +
+                    "extraction to stay within the free tier's per-request size limit — please " +
+                    "double-check that every subject came through.");
+            }
+
             await PersistSubjectsAsync(record.Subjects);
 
             return record;
+        }
+
+        // Roughly 4 characters per token for English text. Leaves headroom for the extraction
+        // system prompt (~2,200 characters) plus a minimum completion budget — see
+        // GroqService.EstimateExtractionMaxTokens, which this number is deliberately kept
+        // consistent with.
+        private const int MaxInputCharsForExtraction = 20000;
+
+        private static (string Text, bool WasTruncated) EnforceMaxInputSize(string text)
+        {
+            if (text.Length <= MaxInputCharsForExtraction)
+            {
+                return (text, false);
+            }
+
+            return (text[..MaxInputCharsForExtraction], true);
+        }
+
+        /// <summary>
+        /// Strips blank-line padding left over from per-page extraction (PdfTextExtractor writes
+        /// a blank line between every page) before the text goes to Groq. This is pure token-count
+        /// hygiene — Groq's free tier caps prompt + completion tokens per minute combined, so
+        /// cutting dead whitespace directly widens how large a document can be processed without
+        /// hitting that limit. Nothing semantically meaningful is removed; the full original text
+        /// is still preserved on <see cref="ExtractedAcademicRecordDto.RawExtractedText"/>.
+        /// </summary>
+        private static string CompactText(string rawText)
+        {
+            var lines = rawText
+                .Replace("\r\n", "\n")
+                .Split('\n')
+                .Select(line => line.TrimEnd());
+
+            var compacted = new List<string>();
+            var previousWasBlank = false;
+
+            foreach (var line in lines)
+            {
+                var isBlank = string.IsNullOrWhiteSpace(line);
+
+                if (isBlank && previousWasBlank)
+                {
+                    continue;
+                }
+
+                compacted.Add(line);
+                previousWasBlank = isBlank;
+            }
+
+            return string.Join("\n", compacted).Trim();
         }
 
         private static string ExtractRawText(byte[] fileBytes, string mimeType, string? fileName)
