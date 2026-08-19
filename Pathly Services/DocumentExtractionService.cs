@@ -49,16 +49,46 @@ namespace Pathly_Services
             }
 
             var compactedText = CompactText(rawText);
+            var (textToSend, wasTruncated) = EnforceMaxInputSize(compactedText);
 
-            var record = await _structuringService.StructureAcademicRecordAsync(compactedText);
+            var record = await _structuringService.StructureAcademicRecordAsync(textToSend);
 
             record.ExtractionAcademicRecordId = Guid.NewGuid();
             record.RawExtractedText = rawText;
             record.ExtractedAt = DateTime.Now;
 
+            if (wasTruncated)
+            {
+                // Groq's free tier caps prompt + completion tokens together per minute, so a very
+                // long document (e.g. a multi-year university transcript) can't always be sent in
+                // full. Rather than silently dropping the tail of the document, flag it explicitly
+                // so the person — or a future chunked-extraction pass — knows to double-check.
+                record.NeedsManualReview = true;
+                record.ExtractionWarnings.Add(
+                    "The document was long enough that part of it had to be trimmed before " +
+                    "extraction to stay within the free tier's per-request size limit — please " +
+                    "double-check that every subject came through.");
+            }
+
             await PersistSubjectsAsync(record.Subjects);
 
             return record;
+        }
+
+        // Roughly 4 characters per token for English text. Leaves headroom for the extraction
+        // system prompt (~2,200 characters) plus a minimum completion budget — see
+        // GroqService.EstimateExtractionMaxTokens, which this number is deliberately kept
+        // consistent with.
+        private const int MaxInputCharsForExtraction = 20000;
+
+        private static (string Text, bool WasTruncated) EnforceMaxInputSize(string text)
+        {
+            if (text.Length <= MaxInputCharsForExtraction)
+            {
+                return (text, false);
+            }
+
+            return (text[..MaxInputCharsForExtraction], true);
         }
 
         /// <summary>
