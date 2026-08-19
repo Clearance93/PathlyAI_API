@@ -85,6 +85,14 @@ namespace Pathly_Utility
             services.AddScoped<IFallbackCareerAiProvider>(sp => sp.GetRequiredService<AzureModelRouterService>());
             services.AddScoped<IGroqService, ResilientCareerAiService>();
 
+            // Document extraction structuring: Groq only, by design (Part: free document
+            // extraction). No Azure fallback here — unlike career analysis, this step is cheap
+            // and low-stakes enough that we accept occasional retries rather than paying for a
+            // paid fallback provider. Wrapped in self-validation/retry so a hallucinated or
+            // incomplete extraction gets a second (and third) attempt before it's trusted.
+            services.AddScoped<IDocumentStructuringService>(sp =>
+                new SelfValidatingDocumentStructuringService(sp.GetRequiredService<GroqService>()));
+
             //Unit of Work
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 

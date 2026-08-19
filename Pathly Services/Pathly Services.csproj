@@ -8,9 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.AI.DocumentIntelligence" Version="1.0.0" />
     <PackageReference Include="IKVM" Version="8.15.0" />
     <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="10.0.9" />
+    <PackageReference Include="PdfPig" Version="0.1.15" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 
   <ItemGroup>
