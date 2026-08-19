@@ -32,10 +32,17 @@ namespace Pathly_Services
             List<CareerEvidenceDto>? careerEvidence,
             PsychometricProfileDto? psychometricProfile)
         {
-            var responseBody = await CallGroqAsync(
-                GroqPromptBuilder.BuildSystemPrompt(),
-                GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile),
-                maxTokens: 8000);
+            var systemPrompt = GroqPromptBuilder.BuildSystemPrompt();
+            var userPrompt = GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile);
+
+            // Analysis output (feedback, roadmap, career matches, study tips, etc.) is much longer
+            // than an extraction JSON, so it gets a higher floor/ceiling than extraction — but it's
+            // still computed from actual prompt size instead of a flat 8000, which is what caused
+            // the 413 here: a flat request guarantees overage on the TPM cap the moment the prompt
+            // (academic record + APS + career evidence + psychometric profile) has any real size.
+            var maxTokens = EstimateMaxTokens(systemPrompt, userPrompt, floorTokens: 800, ceilingTokens: 6500);
+
+            var responseBody = await CallGroqAsync(systemPrompt, userPrompt, maxTokens);
 
             return ParseGroqResponse(responseBody);
         }
@@ -56,33 +63,42 @@ namespace Pathly_Services
             var systemPrompt = GroqPromptBuilder.BuildDocumentExtractionSystemPrompt();
             var userPrompt = GroqPromptBuilder.BuildDocumentExtractionUserPrompt(rawText);
 
-            var responseBody = await CallGroqAsync(systemPrompt, userPrompt, EstimateExtractionMaxTokens(systemPrompt, userPrompt));
+            // Extraction JSON is small even for a long transcript — DocumentExtractionService also
+            // caps input text upstream, so 1200 as a floor is safe here (see the "never force above
+            // available" note on AnalyzeAcademicRecordAsync above for why that floor is lower there).
+            var maxTokens = EstimateMaxTokens(systemPrompt, userPrompt, floorTokens: 1200, ceilingTokens: 4000);
+
+            var responseBody = await CallGroqAsync(systemPrompt, userPrompt, maxTokens);
 
             return ParseExtractionResponse(responseBody);
         }
 
         // Groq's free/on_demand tier enforces a tokens-per-minute cap covering prompt +
         // requested completion combined (8000 TPM at time of writing for openai/gpt-oss-120b). A
-        // flat completion budget either wastes headroom on short transcripts or risks truncating
-        // long ones (a 60+ module university transcript can genuinely need 2500+ completion
-        // tokens of JSON), so this scales the request instead:
+        // flat completion budget either wastes headroom on short requests or guarantees overage on
+        // larger ones (exactly what caused the 413 seen against AnalyzeAcademicRecordAsync — its
+        // max_tokens was flatly 8000 regardless of how big the prompt already was), so both calls
+        // scale their request off actual prompt size instead:
         //   1. Roughly estimate prompt tokens (~4 characters per token is a standard approximation
         //      for English text and holds up fine for a size estimate, not exact billing).
         //   2. Leave a safety margin so we don't shave the request right up to the TPM ceiling.
-        //   3. Clamp between a floor (small records still get enough room) and a ceiling (very
-        //      large documents can't just take an unbounded completion budget — see the
-        //      NeedsManualReview + rechunking note in DocumentExtractionService for that case).
+        //   3. Clamp to a floor/ceiling appropriate to the call. NOTE: if the prompt itself is
+        //      already large enough that "available" falls below the floor, the floor wins and the
+        //      request can still exceed budget — that's an intentional trade-off (a too-short
+        //      completion is recoverable via the truncation check below + retry; a request that's
+        //      too small to be useful isn't worth sending at all). Callers with no upstream cap on
+        //      prompt size (AnalyzeAcademicRecordAsync) use a lower floor for exactly this reason;
+        //      StructureAcademicRecordAsync can safely use a higher floor because
+        //      DocumentExtractionService already caps its input text.
         private const int TokensPerMinuteBudget = 8000;
         private const int SafetyMarginTokens = 300;
-        private const int MinExtractionTokens = 1200;
-        private const int MaxExtractionTokens = 4000;
 
-        private static int EstimateExtractionMaxTokens(string systemPrompt, string userPrompt)
+        private static int EstimateMaxTokens(string systemPrompt, string userPrompt, int floorTokens, int ceilingTokens)
         {
             var estimatedPromptTokens = (systemPrompt.Length + userPrompt.Length) / 4;
             var available = TokensPerMinuteBudget - estimatedPromptTokens - SafetyMarginTokens;
 
-            return Math.Clamp(available, MinExtractionTokens, MaxExtractionTokens);
+            return Math.Clamp(available, floorTokens, ceilingTokens);
         }
 
         private async Task<string> CallGroqAsync(string systemPrompt, string userPrompt, int maxTokens)
