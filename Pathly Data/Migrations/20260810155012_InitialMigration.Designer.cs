@@ -12,8 +12,8 @@ using Pathly_Data;
 namespace Pathly_Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260805181829_AddingExtractionSubject")]
-    partial class AddingExtractionSubject
+    [Migration("20260810155012_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -196,6 +196,9 @@ namespace Pathly_Data.Migrations
                     b.Property<DateTime>("AddedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("AnalysisVersion")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid>("ApsAnalysisId")
                         .HasColumnType("uniqueidentifier");
 
@@ -214,6 +217,9 @@ namespace Pathly_Data.Migrations
                     b.Property<string>("ImprovementtoRoadmap")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsPremium")
+                        .HasColumnType("bit");
+
                     b.Property<string>("MotivationalMessage")
                         .HasColumnType("nvarchar(max)");
 
@@ -221,6 +227,12 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("float");
 
                     b.Property<string>("ParentSummary")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PromptVersion")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PsychometricHash")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResponseJson")
@@ -239,6 +251,9 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.PrimitiveCollection<string>("SubjectChangeSuggestion")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SubjectSetHash")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Summary")
@@ -448,6 +463,61 @@ namespace Pathly_Data.Migrations
                     b.HasIndex("AiResponseId");
 
                     b.ToTable("CareerMaths");
+                });
+
+            modelBuilder.Entity("Pathly_Models.CareerProfile", b =>
+                {
+                    b.Property<Guid>("CareerProfileId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ArtisticWeight")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CareerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("ConventionalWeight")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DemandScore")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("EnterprisingWeight")
+                        .HasColumnType("int");
+
+                    b.Property<int>("GrowthScore")
+                        .HasColumnType("int");
+
+                    b.Property<int>("InvestigativeWeight")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MinimumAps")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RealisticWeight")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequiredSubjects")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SocialWeight")
+                        .HasColumnType("int");
+
+                    b.HasKey("CareerProfileId");
+
+                    b.ToTable("CareerProfiles");
                 });
 
             modelBuilder.Entity("Pathly_Models.DemandingCareerAssessment", b =>
@@ -687,6 +757,62 @@ namespace Pathly_Data.Migrations
                     b.HasKey("ImprovementAdviceId");
 
                     b.ToTable("ImprovementAdvices");
+                });
+
+            modelBuilder.Entity("Pathly_Models.PsychometricProfile", b =>
+                {
+                    b.Property<Guid>("PsychometricProfileId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Artistic")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Conventional")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Enterprising")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Investigative")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Realistic")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Social")
+                        .HasColumnType("int");
+
+                    b.HasKey("PsychometricProfileId");
+
+                    b.ToTable("PsychometricProfiles");
+                });
+
+            modelBuilder.Entity("Pathly_Models.Subject", b =>
+                {
+                    b.Property<Guid>("SubjectId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CanonicalName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("SubjectId");
+
+                    b.ToTable("Subjects");
                 });
 
             modelBuilder.Entity("Pathly_Models.SubjectResults", b =>

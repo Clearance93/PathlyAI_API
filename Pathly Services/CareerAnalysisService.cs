@@ -55,21 +55,14 @@ namespace Pathly_Services
                 Console.WriteLine($"Subject: {subject.SubjectName} | Mark: {subject.NumericMark} | Symbol: {subject.Symbol}");
             }
 
-            // Persist every extraction, independent of whether we end up hitting an LLM.
-            // This is our own dataset going forward, and it's what the subject-set cache
-            // lookup below is keyed against (Part 2).
             await PersistExtractedRecordAsync(academicRecord);
 
-            // Reusable subject knowledge layer — dedups by normalized name, separate from the
-            // per-document extraction above and from personalized analysis caching (Part 2/15).
             await _SubjectKnowledge.EnsureSubjectsPersistedAsync(academicRecord.Subjects);
 
             var apsResult = _ApsCalculation.CalculateAPS(academicRecord.Subjects);
 
             Console.WriteLine($"Calculated APS: {apsResult}");
 
-            // Deterministic career evidence computed before any AI call (Part 9/10/11).
-            // Cheap to (re)compute every request — no need to cache it separately.
             var careerEvidence = await _CareerEvidence.ComputeEvidenceAsync(academicRecord, apsResult);
 
             var subjectSetHash = AcademicRecordFingerprint.ComputeHash(
@@ -138,8 +131,6 @@ namespace Pathly_Services
 
                 ResponseJson = JsonSerializer.Serialize(aiResponse),
 
-                // Only a validated, complete response is ever made servable from cache (Part 3).
-                // We still persist the row either way for audit purposes.
                 SubjectSetHash = isCacheable ? subjectSetHash : null,
                 AnalysisVersion = AcademicRecordFingerprint.CurrentAnalysisVersion,
                 PromptVersion = GroqPromptBuilder.PromptVersion,
@@ -159,10 +150,6 @@ namespace Pathly_Services
             return aiResponse;
         }
 
-        /// <summary>
-        /// Saves the raw extraction (record + every subject) so it's never lost, regardless
-        /// of whether we go on to hit an LLM for it.
-        /// </summary>
         private async Task PersistExtractedRecordAsync(ExtractedAcademicRecordDto academicRecord)
         {
             var extractedRecordEntity = _Mapper.Map<ExtractedAcademicRecord>(academicRecord);
@@ -178,12 +165,6 @@ namespace Pathly_Services
             await _Unit.SaveChangesAsync();
         }
 
-        /// <summary>
-        /// The money-saving step: if we've already analysed this EXACT subject/mark set before
-        /// (same analysis/prompt version, no rounding or fuzzy matching), reuse that stored
-        /// response instead of paying for another LLM call. Only calls out to Groq (with Azure
-        /// Model Router as its own internal fallback) on a genuine cache miss.
-        /// </summary>
         private async Task<(AiResponseDto Response, bool ServedFromCache)> GetAiResponseAsync(
             ExtractedAcademicRecordDto academicRecord,
             ApsResultDto apsResult,
@@ -198,9 +179,7 @@ namespace Pathly_Services
             {
                 try
                 {
-                    var cachedResponse = JsonSerializer.Deserialize<AiResponseDto>(
-                        cached.ResponseJson,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    var cachedResponse = JsonSerializer.Deserialize<AiResponseDto>(cached.ResponseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                     if (cachedResponse is not null)
                     {
@@ -214,18 +193,11 @@ namespace Pathly_Services
                 }
             }
 
-            // Cache miss: Groq first, Azure Model Router as its internal fallback. If both fail,
-            // this throws CareerAnalysisUnavailableException — nothing gets cached (Part 4/3).
-            // No psychometric profile on Layer 1 (academic-only).
             var freshResponse = await _Groq.AnalyzeAcademicRecordAsync(academicRecord, apsResult, careerEvidence, null);
 
             return (freshResponse, false);
         }
 
-        /// <summary>
-        /// Only successfully validated AI responses may be cached (Part 3) — never empty,
-        /// malformed, incomplete, or clearly failed analyses.
-        /// </summary>
         private static bool IsValidForCaching(AiResponseDto? response)
         {
             return response is not null

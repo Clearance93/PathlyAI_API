@@ -11,10 +11,6 @@ namespace PathlyInterfaces.IService
     /// </summary>
     public interface IPremiumCareerAnalysisService
     {
-        Task<AiResponseDto> AnalyzeWithPsychometricsAsync(
-            string base64File,
-            string mimeType,
-            string? fileName,
-            PsychometricProfileDto psychometricProfile);
+        Task<AiResponseDto> AnalyzeWithPsychometricsAsync(string base64File, string mimeType, string? fileName, PsychometricProfileDto psychometricProfile);
     }
 }

@@ -194,8 +194,7 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("AnalysisVersion")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("ApsAnalysisId")
                         .HasColumnType("uniqueidentifier");
@@ -228,12 +227,10 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PromptVersion")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PsychometricHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ResponseJson")
                         .HasColumnType("nvarchar(max)");
@@ -254,8 +251,7 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("SubjectSetHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Summary")
                         .HasColumnType("nvarchar(max)");
@@ -281,10 +277,6 @@ namespace Pathly_Data.Migrations
                     b.HasKey("AiResponseId");
 
                     b.HasIndex("ApsAnalysisId");
-
-                    b.HasIndex("PsychometricHash");
-
-                    b.HasIndex("SubjectSetHash");
 
                     b.ToTable("AiResponse");
                 });
@@ -476,6 +468,9 @@ namespace Pathly_Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("ArtisticWeight")
+                        .HasColumnType("int");
+
                     b.Property<string>("CareerName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -515,9 +510,6 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("SocialWeight")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ArtisticWeight")
                         .HasColumnType("int");
 
                     b.HasKey("CareerProfileId");
@@ -710,6 +702,9 @@ namespace Pathly_Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ExtractedAcademicRecordExtractionAcademicRecordId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("MarkType")
                         .HasColumnType("nvarchar(max)");
 
@@ -726,6 +721,8 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("ExtractionSubjectId");
+
+                    b.HasIndex("ExtractedAcademicRecordExtractionAcademicRecordId");
 
                     b.ToTable("ExtractedSubjects");
                 });
@@ -811,9 +808,6 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("SubjectId");
-
-                    b.HasIndex("NormalizedName")
-                        .IsUnique();
 
                     b.ToTable("Subjects");
                 });
@@ -983,6 +977,13 @@ namespace Pathly_Data.Migrations
                     b.HasOne("Pathly_Models.AiResponse", null)
                         .WithMany("EmploymentOutlooks")
                         .HasForeignKey("AiResponseId");
+                });
+
+            modelBuilder.Entity("Pathly_Models.ExtractedSubject", b =>
+                {
+                    b.HasOne("Pathly_Models.ExtractedAcademicRecord", null)
+                        .WithMany("Subjects")
+                        .HasForeignKey("ExtractedAcademicRecordExtractionAcademicRecordId");
                 });
 
             modelBuilder.Entity("Pathly_Models.SubjectResults", b =>

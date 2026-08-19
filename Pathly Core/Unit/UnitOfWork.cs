@@ -35,6 +35,8 @@ namespace Pathly_Core.Unit
 
         public IPsychometricProfileRepositoryInterface PsychometricProfile { get; private set; }
 
+        public IExtractedSubjectInterfaceRepository SubjectExtraction { get; private set; }
+
         public UnitOfWork(ApplicationDbContext context,
                           IAcademicRecordRepositoryInterface academicRecord,
                           IAuthenticationRepository user,
@@ -49,7 +51,8 @@ namespace Pathly_Core.Unit
                           IExtractedSubjectInterfaceRepository extractedSubject,
                           ISubjectRepositoryInterface subject,
                           ICareerProfileRepositoryInterface careerProfile,
-                          IPsychometricProfileRepositoryInterface psychometricProfile)
+                          IPsychometricProfileRepositoryInterface psychometricProfile,
+                          IExtractedSubjectInterfaceRepository subjectExtraction)
         {
             _Context = context;
             AcademicRecord = academicRecord ?? throw new ArgumentNullException(nameof(academicRecord));
@@ -66,6 +69,7 @@ namespace Pathly_Core.Unit
             Subject = subject ?? throw new ArgumentNullException(nameof(subject));
             CareerProfile = careerProfile ?? throw new ArgumentNullException(nameof(careerProfile));
             PsychometricProfile = psychometricProfile ?? throw new ArgumentNullException(nameof(psychometricProfile));
+            SubjectExtraction = subjectExtraction ?? throw new ArgumentNullException(nameof(subjectExtraction));
         }
 
         public void Dispose()
