@@ -41,11 +41,7 @@ namespace Pathly_Services
             _Unit = unit ?? throw new ArgumentNullException(nameof(unit));
         }
 
-        public async Task<AiResponseDto> AnalyzeWithPsychometricsAsync(
-            string base64File,
-            string mimeType,
-            string? fileName,
-            PsychometricProfileDto psychometricProfile)
+        public async Task<AiResponseDto> AnalyzeWithPsychometricsAsync(string base64File, string mimeType, string? fileName, PsychometricProfileDto psychometricProfile)
         {
             if (psychometricProfile is null)
             {

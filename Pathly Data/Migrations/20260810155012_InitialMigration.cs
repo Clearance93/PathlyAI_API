@@ -6,11 +6,27 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Pathly_Data.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialMigrations : Migration
+    public partial class InitialMigration : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "AcademicRecords",
+                columns: table => new
+                {
+                    AcadmicRecordId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    StudentId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    StudentName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Grade = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ClalculatedAPS = table.Column<int>(type: "int", nullable: false),
+                    UploadedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AcademicRecords", x => x.AcadmicRecordId);
+                });
+
             migrationBuilder.CreateTable(
                 name: "AspNetRoles",
                 columns: table => new
@@ -33,6 +49,10 @@ namespace Pathly_Data.Migrations
                     FullName = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Password = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ProofilePictures = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AuthProvider = table.Column<int>(type: "int", nullable: false),
+                    GoogleId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    MicrosoftId = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Subscription = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
@@ -55,6 +75,47 @@ namespace Pathly_Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CareerProfiles",
+                columns: table => new
+                {
+                    CareerProfileId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CareerName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Category = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    RequiredSubjects = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    MinimumAps = table.Column<int>(type: "int", nullable: false),
+                    RealisticWeight = table.Column<int>(type: "int", nullable: false),
+                    InvestigativeWeight = table.Column<int>(type: "int", nullable: false),
+                    ArtisticWeight = table.Column<int>(type: "int", nullable: false),
+                    SocialWeight = table.Column<int>(type: "int", nullable: false),
+                    EnterprisingWeight = table.Column<int>(type: "int", nullable: false),
+                    ConventionalWeight = table.Column<int>(type: "int", nullable: false),
+                    DemandScore = table.Column<int>(type: "int", nullable: false),
+                    GrowthScore = table.Column<int>(type: "int", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CareerProfiles", x => x.CareerProfileId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ExtractedAcademicRecords",
+                columns: table => new
+                {
+                    ExtractionAcademicRecordId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    StudentName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    InstitutionName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    InstitutionType = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    StudyLevel = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RawExtractedText = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ExtractedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ExtractedAcademicRecords", x => x.ExtractionAcademicRecordId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ImprovementAdvices",
                 columns: table => new
                 {
@@ -69,6 +130,38 @@ namespace Pathly_Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ImprovementAdvices", x => x.ImprovementAdviceId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PsychometricProfiles",
+                columns: table => new
+                {
+                    PsychometricProfileId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Realistic = table.Column<int>(type: "int", nullable: false),
+                    Investigative = table.Column<int>(type: "int", nullable: false),
+                    Artistic = table.Column<int>(type: "int", nullable: false),
+                    Social = table.Column<int>(type: "int", nullable: false),
+                    Enterprising = table.Column<int>(type: "int", nullable: false),
+                    Conventional = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PsychometricProfiles", x => x.PsychometricProfileId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Subjects",
+                columns: table => new
+                {
+                    SubjectId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CanonicalName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    NormalizedName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Subjects", x => x.SubjectId);
                 });
 
             migrationBuilder.CreateTable(
@@ -195,13 +288,35 @@ namespace Pathly_Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ExtractedSubjects",
+                columns: table => new
+                {
+                    ExtractionSubjectId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    SubjectName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RawMark = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    NumericMark = table.Column<int>(type: "int", nullable: true),
+                    Symbol = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    MarkType = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ExtractedAcademicRecordExtractionAcademicRecordId = table.Column<Guid>(type: "uniqueidentifier", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ExtractedSubjects", x => x.ExtractionSubjectId);
+                    table.ForeignKey(
+                        name: "FK_ExtractedSubjects_ExtractedAcademicRecords_ExtractedAcademicRecordExtractionAcademicRecordId",
+                        column: x => x.ExtractedAcademicRecordExtractionAcademicRecordId,
+                        principalTable: "ExtractedAcademicRecords",
+                        principalColumn: "ExtractionAcademicRecordId");
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ApsAnalysiss",
                 columns: table => new
                 {
                     ApsAnalysisId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     CalculatedAps = table.Column<int>(type: "int", nullable: false),
                     ApsExplanation = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    QualifiesForUniveisty = table.Column<bool>(type: "bit", nullable: false),
+                    QualifiesForUniversity = table.Column<bool>(type: "bit", nullable: false),
                     QualificationMessage = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     UniversitiesTheyQualifyFor = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     UniversitiestheyDoNotQualifyFor = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -228,7 +343,13 @@ namespace Pathly_Data.Migrations
                     Grade = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Summary = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ApsAnalysisId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    OverallScore = table.Column<int>(type: "int", nullable: false),
+                    ResponseJson = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    SubjectSetHash = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PsychometricHash = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AnalysisVersion = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PromptVersion = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsPremium = table.Column<bool>(type: "bit", nullable: false),
+                    OverallScore = table.Column<double>(type: "float", nullable: false),
                     AcademicPersonality = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     FeedBack = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     UserStrength = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -378,17 +499,24 @@ namespace Pathly_Data.Migrations
                 columns: table => new
                 {
                     SubjectResultId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Subect = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Subject = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Mark = table.Column<int>(type: "int", nullable: false),
                     Grade = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CareerRelevance = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ImprovementTip = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     AddedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    AcademicRecordId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     AiResponseId = table.Column<Guid>(type: "uniqueidentifier", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_SubjectResults", x => x.SubjectResultId);
+                    table.ForeignKey(
+                        name: "FK_SubjectResults_AcademicRecords_AcademicRecordId",
+                        column: x => x.AcademicRecordId,
+                        principalTable: "AcademicRecords",
+                        principalColumn: "AcadmicRecordId",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_SubjectResults_AiResponse_AiResponseId",
                         column: x => x.AiResponseId,
@@ -466,6 +594,16 @@ namespace Pathly_Data.Migrations
                 column: "AiResponseId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ExtractedSubjects_ExtractedAcademicRecordExtractionAcademicRecordId",
+                table: "ExtractedSubjects",
+                column: "ExtractedAcademicRecordExtractionAcademicRecordId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SubjectResults_AcademicRecordId",
+                table: "SubjectResults",
+                column: "AcademicRecordId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SubjectResults_AiResponseId",
                 table: "SubjectResults",
                 column: "AiResponseId");
@@ -493,6 +631,9 @@ namespace Pathly_Data.Migrations
                 name: "CareerMaths");
 
             migrationBuilder.DropTable(
+                name: "CareerProfiles");
+
+            migrationBuilder.DropTable(
                 name: "DemandingCareerAssessments");
 
             migrationBuilder.DropTable(
@@ -502,7 +643,16 @@ namespace Pathly_Data.Migrations
                 name: "EmploymentOutlooks");
 
             migrationBuilder.DropTable(
+                name: "ExtractedSubjects");
+
+            migrationBuilder.DropTable(
+                name: "PsychometricProfiles");
+
+            migrationBuilder.DropTable(
                 name: "SubjectResults");
+
+            migrationBuilder.DropTable(
+                name: "Subjects");
 
             migrationBuilder.DropTable(
                 name: "UniveristyQualifications");
@@ -512,6 +662,12 @@ namespace Pathly_Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
+
+            migrationBuilder.DropTable(
+                name: "ExtractedAcademicRecords");
+
+            migrationBuilder.DropTable(
+                name: "AcademicRecords");
 
             migrationBuilder.DropTable(
                 name: "AiResponse");

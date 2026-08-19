@@ -20,7 +20,6 @@ namespace PathlyAI_API.Controllers
             _PremiumCareerService = premiumCareerService ?? throw new ArgumentNullException(nameof(premiumCareerService));
         }
 
-        /// <summary>Layer 1 (Part 6) — academic-only career analysis. No psychometric data required.</summary>
         [HttpPost("analysis")] 
         public async Task<IActionResult> Analyze([FromBody] AcademicRecordUploadDto dto)
         {
@@ -73,8 +72,7 @@ namespace PathlyAI_API.Controllers
 
             try
             {
-                var result = await _PremiumCareerService.AnalyzeWithPsychometricsAsync(
-                    dto.Base64File, dto.MimeType, dto.FileName, dto.PsychometricProfile);
+                var result = await _PremiumCareerService.AnalyzeWithPsychometricsAsync(dto.Base64File, dto.MimeType, dto.FileName, dto.PsychometricProfile);
 
                 return Ok(result);
             }

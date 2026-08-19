@@ -26,7 +26,7 @@ namespace Pathly_Core.Unit
 
         IAuthenticationRepository User { get; }
 
-        ExtractedAcademicRecordInterfaceRepository ExtractedAcademicRecord { get; }
+        //ExtractedAcademicRecordInterfaceRepository ExtractedAcademicRecord { get; }
 
         IExtractedSubjectInterfaceRepository ExtractedSubject { get; }
 
