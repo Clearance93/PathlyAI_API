@@ -9,13 +9,6 @@ using Pathly_Utility;
 
 var builder = WebApplication.CreateBuilder(args);
 
-if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Key"]))
-{
-    throw new InvalidOperationException(
-        "The JWT signing key is not configured. Set 'Jwt:Key' via user secrets in development " +
-        "or the 'Jwt__Key' environment variable in production.");
-}
-
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("PathlyConnection");
@@ -67,22 +60,32 @@ builder.Services
     })
     .AddJwtBearer(options =>
     {
-        var jwtKey = builder.Configuration["Jwt:Key"];
-        var jwtIssuer = builder.Configuration["Jwt:Issuer"];
-        var jwtAudience = builder.Configuration["Jwt:Audience"];
-
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = jwtIssuer,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidateAudience = true,
-            ValidAudience = jwtAudience,
+            ValidAudience = builder.Configuration["Jwt:Audience"],
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!)),
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(GetJwtKey(builder.Configuration))),
             ClockSkew = TimeSpan.FromMinutes(1)
         };
     });
+
+static string GetJwtKey(ConfigurationManager configuration)
+{
+    var key = configuration["Jwt:Key"];
+    if (string.IsNullOrWhiteSpace(key))
+    {
+        throw new InvalidOperationException(
+            "The JWT signing key is not configured. Set 'Jwt:Key' via user secrets in development " +
+            "or the 'Jwt__Key' environment variable in production.");
+    }
+
+    return key;
+}
 
 builder.Services.AddCors(options =>
 {

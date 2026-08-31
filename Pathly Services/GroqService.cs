@@ -19,6 +19,11 @@ namespace Pathly_Services
         private readonly ILogger<GroqService> _Logger;
         private readonly List<GroqKeySettings> _AllKeys;
 
+        // Rotated on every request so consecutive calls start on different keys — this spreads
+        // each key's tokens-per-minute budget across the whole key pool instead of always
+        // hammering key 1 until it 429s and only then falling back.
+        private static int _KeyRotationIndex;
+
         public GroqService(HttpClient httpClient,
                           IOptions<GroqSettings> groqSettings,
                           ILogger<GroqService> logger)
@@ -26,9 +31,27 @@ namespace Pathly_Services
             _HttpClient = httpClient;
             _GroqSettings = groqSettings.Value;
             _Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _AllKeys = _GroqSettings.GetAllKeys()
-                .Select(k => new GroqKeySettings { GroqApiKey = k, BaseUrl = _GroqSettings.BaseUrl, Model = _GroqSettings.Model })
-                .ToList();
+            _AllKeys = BuildKeyList(_GroqSettings);
+        }
+
+        private static List<GroqKeySettings> BuildKeyList(GroqSettings settings)
+        {
+            var keys = new List<GroqKeySettings>();
+
+            if (!string.IsNullOrWhiteSpace(settings.GroqApiKey))
+            {
+                keys.Add(new GroqKeySettings
+                {
+                    Name = "Primary",
+                    GroqApiKey = settings.GroqApiKey,
+                    BaseUrl = settings.BaseUrl,
+                    Model = settings.Model
+                });
+            }
+
+            keys.AddRange(settings.FallbackKeys);
+
+            return keys;
         }
 
         public async Task<AiResponseDto> AnalyzeAcademicRecordAsync(ExtractedAcademicRecordDto academicRecord, ApsResultDto apsResult)
@@ -52,9 +75,7 @@ namespace Pathly_Services
             // (academic record + APS + career evidence + psychometric profile) has any real size.
             var maxTokens = EstimateMaxTokens(systemPrompt, userPrompt, floorTokens: 800, ceilingTokens: 6500);
 
-            var responseBody = await CallGroqAsync(systemPrompt, userPrompt, maxTokens);
-
-            return ParseGroqResponse(responseBody);
+            return await CallGroqAsync(systemPrompt, userPrompt, maxTokens, ParseGroqResponse);
         }
 
         /// <summary>
@@ -78,9 +99,7 @@ namespace Pathly_Services
             // available" note on AnalyzeAcademicRecordAsync above for why that floor is lower there).
             var maxTokens = EstimateMaxTokens(systemPrompt, userPrompt, floorTokens: 1200, ceilingTokens: 4000);
 
-            var responseBody = await CallGroqAsync(systemPrompt, userPrompt, maxTokens);
-
-            return ParseExtractionResponse(responseBody);
+            return await CallGroqAsync(systemPrompt, userPrompt, maxTokens, ParseExtractionResponse);
         }
 
         // Groq's free/on_demand tier enforces a tokens-per-minute cap covering prompt +
@@ -112,116 +131,129 @@ namespace Pathly_Services
         }
 
         // The free/on_demand tier also counts every call in the pipeline against one shared
-        // tokens-per-minute window. AnalyzeAsync fires two Groq calls back-to-back (document
-        // extraction, then career analysis), so the second call regularly lands while the first
-        // is still consuming the same 8000 TPM budget and gets rejected with a 429 carrying a
-        // "Please try again in Ns" hint. Failing the whole user request over that is worse than
-        // simply waiting out the remainder of the window, so CallGroqAsync retries a bounded
-        // number of times using the delay Groq reports (Retry-After header when present, else
-        // parsed from the error body).
-        private const int MaxRateLimitRetries = 3;
+        // tokens-per-minute window PER KEY. CallGroqAsync therefore works the key pool like this:
+        //   1. Each request starts on a different key (round-robin, see _KeyRotationIndex) so
+        //      consecutive requests spread their TPM load across keys instead of concentrating
+        //      on the first one.
+        //   2. On a 429 (or an unusable/truncated response) it moves to the NEXT key immediately
+        //      rather than sleeping — a different key's TPM window is almost certainly still open.
+        //   3. Only after a full pass over every key does it wait out the longest rate-limit delay
+        //      Groq reported and try the key pool once more (skipping keys that failed with a
+        //      non-retryable error such as an invalid key).
+        private const int MaxKeyPoolPasses = 2;
         private const int RateLimitRetryBufferSeconds = 2;
 
-        private async Task<string> CallGroqAsync(string systemPrompt, string userPrompt, int maxTokens)
+        private async Task<TResponse> CallGroqAsync<TResponse>(
+            string systemPrompt,
+            string userPrompt,
+            int maxTokens,
+            Func<string, TResponse> parseResponse)
         {
-            var requestBody = new
+            var keys = _AllKeys
+                .Where(k => !string.IsNullOrWhiteSpace(k.GroqApiKey))
+                .ToList();
+
+            if (keys.Count == 0)
             {
-                model = _GroqSettings.Model,
-                max_tokens = maxTokens,
-                messages = new[]
-                {
-                    new
-                    {
-                        role = "system",
-                        content = systemPrompt
-                    },
-                    new
-                    {
-                        role = "user",
-                        content = userPrompt
-                    }
-                }
-            };
+                throw new HttpRequestException("No Groq API keys are configured.");
+            }
 
-            var json = JsonSerializer.Serialize(requestBody);
-
-            var allKeys = _AllKeys.ToList();
+            var startIndex = (int)((uint)Interlocked.Increment(ref _KeyRotationIndex) % keys.Count);
             var lastError = string.Empty;
+            TimeSpan? rateLimitDelay = null;
+            var sawRetryableFailure = false;
+            var skippedKeys = new HashSet<string>();
 
-            for (var keyIndex = 0; keyIndex < allKeys.Count; keyIndex++)
+            for (var pass = 0; pass < MaxKeyPoolPasses; pass++)
             {
-                var currentKey = allKeys[keyIndex];
-                var keyName = currentKey.Name ?? $"Key {keyIndex + 1}";
-                var apiKey = currentKey.GroqApiKey?.Trim();
-                var baseUrl = string.IsNullOrWhiteSpace(currentKey.BaseUrl) ? _GroqSettings.BaseUrl : currentKey.BaseUrl;
-                var model = string.IsNullOrWhiteSpace(currentKey.Model) ? _GroqSettings.Model : currentKey.Model;
-
-                if (string.IsNullOrWhiteSpace(apiKey))
+                if (pass > 0)
                 {
-                    _Logger.LogWarning("Skipping Groq key '{KeyName}' — API key is empty", keyName);
-                    continue;
+                    if (!sawRetryableFailure)
+                    {
+                        break;
+                    }
+
+                    var delay = rateLimitDelay ?? TimeSpan.FromSeconds(30);
+                    _Logger.LogWarning(
+                        "All {KeyCount} Groq key(s) hit their rate limit or returned unusable content — waiting {Delay:0.#}s before one more pass.",
+                        keys.Count, delay.TotalSeconds);
+
+                    await Task.Delay(delay);
                 }
 
-                var requestBodyWithModel = new
+                for (var offset = 0; offset < keys.Count; offset++)
                 {
-                    model = model,
-                    max_tokens = maxTokens,
-                    messages = new[]
+                    var keyIndex = (startIndex + offset) % keys.Count;
+                    var currentKey = keys[keyIndex];
+                    var keyName = string.IsNullOrWhiteSpace(currentKey.Name) ? $"Key {keyIndex + 1}" : currentKey.Name!;
+
+                    if (skippedKeys.Contains(keyName))
                     {
-                        new
-                        {
-                            role = "system",
-                            content = systemPrompt
-                        },
-                        new
-                        {
-                            role = "user",
-                            content = userPrompt
-                        }
-                    }
-                };
-                var jsonWithModel = JsonSerializer.Serialize(requestBodyWithModel);
-
-                for (var attempt = 1; attempt <= MaxRateLimitRetries; attempt++)
-                {
-                    using var request = new HttpRequestMessage(HttpMethod.Post, baseUrl)
-                    {
-                        Content = new StringContent(jsonWithModel, Encoding.UTF8, "application/json")
-                    };
-
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-
-                    var response = await _HttpClient.SendAsync(request);
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        if (keyIndex > 0)
-                        {
-                            _Logger.LogInformation("Groq request succeeded using fallback key '{KeyName}' (index {KeyIndex})", keyName, keyIndex);
-                        }
-                        return await response.Content.ReadAsStringAsync();
-                    }
-
-                    var error = await response.Content.ReadAsStringAsync();
-                    lastError = $"Groq API failed with key '{keyName}': {response.StatusCode} - {error}";
-
-                    if ((int)response.StatusCode == 429)
-                    {
-                        var delay = GetRateLimitRetryDelay(response, error);
-
-                        _Logger.LogWarning(
-                            "Groq rate limit hit on key '{KeyName}' (attempt {Attempt}/{MaxRetries}) — retrying in {Delay:0.#}s.",
-                            keyName, attempt, MaxRateLimitRetries, delay.TotalSeconds);
-
-                        await Task.Delay(delay);
                         continue;
                     }
 
-                    _Logger.LogWarning("Groq key '{KeyName}' failed with non-retryable error: {StatusCode}", keyName, response.StatusCode);
-                    break;
-                }
+                    var baseUrl = string.IsNullOrWhiteSpace(currentKey.BaseUrl) ? _GroqSettings.BaseUrl : currentKey.BaseUrl;
+                    var model = string.IsNullOrWhiteSpace(currentKey.Model) ? _GroqSettings.Model : currentKey.Model;
 
-                _Logger.LogWarning("Groq key '{KeyName}' exhausted after {MaxRetries} retries, trying next fallback...", keyName, MaxRateLimitRetries);
+                    var requestBody = new
+                    {
+                        model = model,
+                        max_tokens = maxTokens,
+                        messages = new[]
+                        {
+                            new { role = "system", content = systemPrompt },
+                            new { role = "user", content = userPrompt }
+                        }
+                    };
+
+                    using var request = new HttpRequestMessage(HttpMethod.Post, baseUrl)
+                    {
+                        Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
+                    };
+
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", currentKey.GroqApiKey!.Trim());
+
+                    var response = await _HttpClient.SendAsync(request);
+                    var body = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        try
+                        {
+                            return parseResponse(body);
+                        }
+                        catch (Exception ex) when (ex is InvalidOperationException or JsonException)
+                        {
+                            // HTTP 200 but the content is truncated/unparsable — treat it like any
+                            // other failure and let the next key take the work.
+                            lastError = $"Groq key '{keyName}' returned unusable content: {ex.Message}";
+                            sawRetryableFailure = true;
+                            _Logger.LogWarning(lastError);
+                            continue;
+                        }
+                    }
+
+                    lastError = $"Groq API failed with key '{keyName}': {response.StatusCode} - {body}";
+
+                    if ((int)response.StatusCode == 429)
+                    {
+                        var delay = GetRateLimitRetryDelay(response, body);
+                        rateLimitDelay = rateLimitDelay is null || delay > rateLimitDelay ? delay : rateLimitDelay;
+                        sawRetryableFailure = true;
+
+                        _Logger.LogWarning(
+                            "Groq rate limit hit on key '{KeyName}' — moving to the next key ({Offset}/{KeyCount}).",
+                            keyName, offset + 1, keys.Count);
+
+                        continue;
+                    }
+
+                    _Logger.LogWarning(
+                        "Groq key '{KeyName}' failed with a non-retryable error ({StatusCode}) — skipping it for the rest of this request.",
+                        keyName, response.StatusCode);
+
+                    skippedKeys.Add(keyName);
+                }
             }
 
             throw new HttpRequestException($"All Groq API keys exhausted. Last error: {lastError}");
