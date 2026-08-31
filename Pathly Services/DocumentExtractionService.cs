@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Pathly_Core.Unit;
 using Pathly_DTOs;
+using Pathly_Helper;
 using Pathly_Models;
 using PathlyInterfaces.IService;
 
@@ -43,7 +44,7 @@ namespace Pathly_Services
 
             if (string.IsNullOrWhiteSpace(rawText) || rawText.Trim().Length < MinimumUsableTextLength)
             {
-                throw new InvalidOperationException(
+                throw new DocumentTextExtractionException(
                     "Could not read enough text from this file. If it's a scanned/photographed " +
                     "PDF with no text layer, please upload it as a JPG/PNG image instead so OCR can run on it.");
             }

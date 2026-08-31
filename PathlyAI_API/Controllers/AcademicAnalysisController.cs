@@ -52,6 +52,10 @@ namespace PathlyAI_API.Controllers
 
                 return Ok(result);
             }
+            catch (DocumentTextExtractionException ex)
+            {
+                return BadRequest(new { error = "document_not_readable", message = ex.Message });
+            }
             catch (QuotaExceededException ex)
             {
                 return StatusCode(StatusCodes.Status402PaymentRequired, new
@@ -103,6 +107,10 @@ namespace PathlyAI_API.Controllers
                 await _Billing.RecordUsageAsync(userId ?? string.Empty, UsageType.PremiumAnalysis);
 
                 return Ok(result);
+            }
+            catch (DocumentTextExtractionException ex)
+            {
+                return BadRequest(new { error = "document_not_readable", message = ex.Message });
             }
             catch (QuotaExceededException ex)
             {

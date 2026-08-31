@@ -30,6 +30,20 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
+
+# Tesseract OCR (ImageOcrExtractor): the Tesseract NuGet package only ships Windows
+# native libraries, so the Linux ones come from apt. The wrapper P/Invokes
+# "libtesseract50.so" and "libleptonica-1.82.0.so" by name, so symlinks are created
+# for those exact names. eng.traineddata (installed by tesseract-ocr) is copied to
+# /app/tessdata where ImageOcrExtractor expects it.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr libtesseract-dev libleptonica-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/lib/x86_64-linux-gnu/libtesseract.so /usr/lib/x86_64-linux-gnu/libtesseract50.so \
+    && ln -s /usr/lib/x86_64-linux-gnu/libleptonica.so /usr/lib/x86_64-linux-gnu/libleptonica-1.82.0.so \
+    && mkdir -p /app/tessdata \
+    && cp /usr/share/tesseract-ocr/*/tessdata/eng.traineddata /app/tessdata/
+
 COPY --from=build /app/publish .
 
 ENTRYPOINT ["dotnet", "PathlyAI_API.dll"]
