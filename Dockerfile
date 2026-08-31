@@ -23,7 +23,7 @@ COPY . .
 
 # Build and publish the application
 WORKDIR "/src/PathlyAI_API"
-RUN dotnet publish "PathlyAI_API.csproj" -c Release -o /app/publish /p:UseAppHost=false --force
+RUN dotnet publish "PathlyAI_API.csproj" -c Release -o /app/publish /p:UseAppHost=false --force && echo "=== PUBLISH OUTPUT CHECK ===" && ls -la /app/publish | grep -i identity; echo "=== END CHECK ==="
 
 # Final stage: runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
