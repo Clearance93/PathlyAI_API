@@ -10,10 +10,10 @@ namespace Pathly_Data
         {
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
             
-            // Using the Neon connection string directly for design-time tools
-            var connectionString = "Host=ep-young-hall-b11d2otw-pooler.c-5.eu-central-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=npg_6SEVACGgdm1D;SSL Mode=Require;Channel Binding=Require";
+            // Using the Azure SQL connection string directly for design-time tools
+            var connectionString = "Server=tcp:pathlyserver.database.windows.net,1433;Initial Catalog=pathlydb;Persist Security Info=False;User ID=clearance;Password=1!Pathly;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30";
             
-            optionsBuilder.UseNpgsql(connectionString);
+            optionsBuilder.UseSqlServer(connectionString);
 
             return new ApplicationDbContext(optionsBuilder.Options);
         }

@@ -54,6 +54,17 @@ namespace Pathly_Services
 
             var record = await _structuringService.StructureAcademicRecordAsync(textToSend);
 
+            // The structuring service hands back an empty record when every validation/retry
+            // attempt fails, so treat "no subjects extracted" as a controlled, user-fixable
+            // failure instead of letting an empty subject list crash downstream (e.g. Average()).
+            if (record.Subjects.Count == 0)
+            {
+                throw new DocumentTextExtractionException(
+                    "We couldn't identify any subjects with marks in this document. " +
+                    "If it's a scanned/photographed PDF, please upload it as a JPG/PNG image " +
+                    "instead so OCR can run on it.");
+            }
+
             record.ExtractionAcademicRecordId = Guid.NewGuid();
             record.RawExtractedText = rawText;
             record.ExtractedAt = DateTime.Now;

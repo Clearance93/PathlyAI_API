@@ -53,7 +53,7 @@ namespace Pathly_Services
                 }
             }
 
-            result.AverageMark = subjects.Average(x => x.NumericMark ?? 0);
+            result.AverageMark = subjects.Count == 0 ? 0 : subjects.Average(x => x.NumericMark ?? 0);
 
             result.Distinctions = subjects.Count(x => (x.NumericMark ?? 0) >= 80);
 

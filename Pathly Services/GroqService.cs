@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pathly_Core;
 using Pathly_DTOs;
@@ -26,15 +27,44 @@ namespace Pathly_Services
 
         public GroqService(HttpClient httpClient,
                           IOptions<GroqSettings> groqSettings,
+                          IConfiguration configuration,
                           ILogger<GroqService> logger)
         {
             _HttpClient = httpClient;
             _GroqSettings = groqSettings.Value;
             _Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _AllKeys = BuildKeyList(_GroqSettings);
+
+            // Fallback keys can be stored as flat top-level sections (e.g. user secrets using
+            // "EduHubGroq:GroqApiKey" / "PahtlyGroq:GroqApiKey" instead of the "Groq:FallbackKeys"
+            // array). Read them straight from configuration so a dead primary key doesn't take the
+            // whole pipeline down with it.
+            var flatKeys = new List<GroqKeySettings>();
+            var flatConfig = new[]
+            {
+                ("EduHubGroq", configuration["EduHubGroq:GroqApiKey"]),
+                ("PahtlyGroq", configuration["PahtlyGroq:GroqApiKey"])
+            };
+
+            foreach (var (name, key) in flatConfig)
+            {
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                flatKeys.Add(new GroqKeySettings
+                {
+                    Name = name,
+                    GroqApiKey = key,
+                    BaseUrl = _GroqSettings.BaseUrl,
+                    Model = _GroqSettings.Model
+                });
+            }
+
+            _AllKeys = BuildKeyList(_GroqSettings, flatKeys);
         }
 
-        private static List<GroqKeySettings> BuildKeyList(GroqSettings settings)
+        private static List<GroqKeySettings> BuildKeyList(GroqSettings settings, List<GroqKeySettings>? flatFallbacks = null)
         {
             var keys = new List<GroqKeySettings>();
 
@@ -50,6 +80,30 @@ namespace Pathly_Services
             }
 
             keys.AddRange(settings.FallbackKeys);
+
+            // Flat fallback sections (e.g. user secrets using "EduHubGroq:GroqApiKey" instead of
+            // the "Groq:FallbackKeys" array). Merged here so a dead primary key doesn't take the
+            // whole pipeline down with it.
+            foreach (var flat in flatFallbacks ?? new List<GroqKeySettings>())
+            {
+                if (string.IsNullOrWhiteSpace(flat.GroqApiKey))
+                {
+                    continue;
+                }
+
+                if (keys.Any(k => k.Name == flat.Name || k.GroqApiKey == flat.GroqApiKey))
+                {
+                    continue;
+                }
+
+                keys.Add(new GroqKeySettings
+                {
+                    Name = flat.Name,
+                    GroqApiKey = flat.GroqApiKey,
+                    BaseUrl = string.IsNullOrWhiteSpace(flat.BaseUrl) ? settings.BaseUrl : flat.BaseUrl,
+                    Model = string.IsNullOrWhiteSpace(flat.Model) ? settings.Model : flat.Model
+                });
+            }
 
             return keys;
         }

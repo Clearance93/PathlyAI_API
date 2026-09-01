@@ -11,23 +11,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("PathlyConnection");
-    if (!string.IsNullOrEmpty(connectionString) && IsPostgreSqlConnectionString(connectionString))
-    {
-        options.UseNpgsql(connectionString);
-    }
-    else
-    {
-        options.UseSqlServer(connectionString!);
-    }
+    options.UseSqlServer(builder.Configuration.GetConnectionString("PathlyConnection"));
 });
-
-static bool IsPostgreSqlConnectionString(string connectionString)
-{
-    return connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
-           connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase) ||
-           connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase) && connectionString.Contains("Database=", StringComparison.OrdinalIgnoreCase);
-}
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
