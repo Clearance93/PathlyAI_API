@@ -1,11 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Pathly_DTOs;
+using Pathly_Helper;
 using PathlyInterfaces.IService;
 
 namespace PathlyAI_API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [AllowAnonymous]
     public class AuthenticationController : ControllerBase
     {
         private readonly IAuthServiceInterface _Auth;
@@ -18,33 +21,40 @@ namespace PathlyAI_API.Controllers
         [HttpPost("registration")]
         public async Task<IActionResult> Registration(UserDto dto)
         {
-            var newUser = await _Auth.AddNewUserAsync(dto);
-
-            if (newUser != null)
+            try
             {
-                return Ok(new
-                {
-                    message = newUser
-                });
-            }
+                var newUser = await _Auth.AddNewUserAsync(dto);
 
-            return BadRequest(new { message = "Failed to add new user" });
+                if (newUser != null)
+                {
+                    return Ok(newUser);
+                }
+
+                return BadRequest(new { message = "Failed to add new user" });
+            }
+            catch (KeyNotFoundException)
+            {
+                return Conflict(new { message = "An account with this email already exists." });
+            }
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
-            var returnUser = await _Auth.AuthenticateTheUserAsync(dto);
-
-            if (returnUser == null)
+            try
             {
-                return BadRequest(new
-                {
-                    message = $"Failed to authenticate the user with the email: {dto.Email}"
-                });
-            }
+                var returnUser = await _Auth.AuthenticateTheUserAsync(dto);
 
-            return Ok(returnUser);
+                return Ok(returnUser);
+            }
+            catch (AccountLockedException ex)
+            {
+                return StatusCode(StatusCodes.Status423Locked, new { message = ex.Message });
+            }
+            catch (InvalidCredentialsException)
+            {
+                return Unauthorized(new { message = "Invalid email or password." });
+            }
         }
     }
 }

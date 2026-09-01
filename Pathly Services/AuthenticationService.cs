@@ -1,15 +1,13 @@
 ﻿using AutoMapper;
-using javax.security.auth.login;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Pathly_Core.Unit;
 using Pathly_DTOs;
+using Pathly_Helper;
 using Pathly_Models;
 using PathlyInterfaces.IService;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Authentication;
 using System.Security.Claims;
 using System.Text;
 
@@ -49,7 +47,7 @@ namespace Pathly_Services
             user.Password = passwordHasher.HashPassword(user, dto.Password!);
 
             user.Id = Guid.NewGuid().ToString();
-            user.CreatedAt = DateTime.Now;
+            user.CreatedAt = DateTime.UtcNow;
             user.UserName = dto.Email;
             user.PhoneNumber = dto.PhoneNumber;
 
@@ -62,10 +60,9 @@ namespace Pathly_Services
                 throw new InvalidOperationException($"User creation failed: {errors}");
             }
 
-            var token = await _UserManager.GenerateEmailConfirmationTokenAsync(user);
-
-            var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
-            var encodedUserId = Uri.EscapeDataString(user.Id);
+            // Carry the new account's id through so the response includes it (the UI links
+            // psychometric submissions against this id).
+            dto.Id = user.Id;
 
             return await GenerateTokenAsync(dto);
         }
@@ -100,7 +97,7 @@ namespace Pathly_Services
                     issuer: jwtIssuer,
                     audience: jwtAudience,
                     claims: claims,
-                    expires: DateTime.Now.AddHours(24),
+                    expires: DateTime.UtcNow.AddHours(24),
                     signingCredentials: creds
                 );
 
@@ -108,7 +105,9 @@ namespace Pathly_Services
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
                 ExpirationDate = token.ValidTo,
-                Email = dto.Email
+                Email = dto.Email,
+                UserId = dto.Id,
+                FullName = dto.FullName
             };
         }
 
@@ -116,12 +115,19 @@ namespace Pathly_Services
         {
             var existingUser = await _Unit.User.GetTheUserByEmail(dto.Email!);
 
-            if (existingUser == null) 
+            if (existingUser == null)
             {
-                throw new AuthenticationException($"The account with the email {dto.Email} does not exist, Please register your account");
+                throw new InvalidCredentialsException("Invalid email or password");
             }
 
             var user = existingUser;
+
+            if (user.LockoutEnd is not null && user.LockoutEnd > DateTimeOffset.UtcNow)
+            {
+                throw new AccountLockedException(
+                    "Your account is locked due to multiple failed login attempts. Please try again in 15 minutes.",
+                    user.LockoutEnd);
+            }
 
             var passwordhasher = new PasswordHasher<ApplicationUser>();
 
@@ -135,11 +141,17 @@ namespace Pathly_Services
 
                 if (user.AccessFailedCount >= 5)
                 {
-                    user.LockoutEnd = DateTimeOffset.Now.AddMinutes(15);
+                    user.LockoutEnd = DateTimeOffset.UtcNow.AddMinutes(15);
 
                     user.LockoutEnabled = true;
 
-                    throw new AccountLockedException("Your accunt is blocked due to multiple failed login attempts. Please try again aft 15 minutes");
+                    _Unit.User.Update(user);
+
+                    await _Unit.SaveChangesAsync();
+
+                    throw new AccountLockedException(
+                        "Your account is locked due to multiple failed login attempts. Please try again in 15 minutes.",
+                        user.LockoutEnd);
                 }
 
                 _Unit.User.Update(user);
@@ -157,7 +169,7 @@ namespace Pathly_Services
                 return await GenerateTokenAsync(_Mapper.Map<UserDto>(user));
             }
 
-            throw new AuthenticationException("Invalid email or password");
+            throw new InvalidCredentialsException("Invalid email or password");
         }
     }
 }

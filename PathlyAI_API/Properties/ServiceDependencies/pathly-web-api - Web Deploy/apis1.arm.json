@@ -97,11 +97,11 @@
               "type": "Microsoft.ApiManagement/service/apis",
               "name": "Pathly-wep-app-api/pathly-web-api",
               "properties": {
-                "displayName": "pathly-web-api",
+                "displayName": "PathlyAI_API | v1",
                 "apiRevision": "1",
                 "description": null,
                 "subscriptionRequired": true,
-                "serviceUrl": null,
+                "serviceUrl": "https://pathly-web-api-byfkaba3gvddf9dp.southafricanorth-01.azurewebsites.net",
                 "path": "",
                 "protocols": [
                   "https"

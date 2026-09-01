@@ -36,6 +36,60 @@ namespace Pathly_Data
 
         public DbSet<PsychometricProfile> PsychometricProfiles { get; set; }
 
+        public DbSet<PsychometricAssessment> PsychometricAssessments { get; set; }
+
         public DbSet<CareerProfile> CareerProfiles { get; set; }
+
+        public DbSet<Plan> Plans { get; set; }
+
+        public DbSet<UserSubscription> UserSubscriptions { get; set; }
+
+        public DbSet<PaymentTransaction> PaymentTransactions { get; set; }
+
+        public DbSet<UsageTransaction> UsageTransactions { get; set; }
+
+        public DbSet<CreditTransaction> CreditTransactions { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // A learner owns many psychometric profiles (one per distinct score set) — removing
+            // the account must not silently delete their assessment history, so no cascade.
+            modelBuilder.Entity<PsychometricProfile>()
+                .HasOne(p => p.ApplicationUser)
+                .WithMany()
+                .HasForeignKey(p => p.ApplicationUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PsychometricAssessment>()
+                .HasOne(a => a.ApplicationUser)
+                .WithMany()
+                .HasForeignKey(a => a.ApplicationUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PsychometricAssessment>()
+                .HasOne(a => a.PsychometricProfile)
+                .WithMany()
+                .HasForeignKey(a => a.PsychometricProfileId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Plan>()
+                .HasIndex(p => p.Code)
+                .IsUnique();
+
+            modelBuilder.Entity<UserSubscription>()
+                .HasIndex(s => new { s.UserId, s.Status });
+
+            modelBuilder.Entity<PaymentTransaction>()
+                .HasIndex(t => t.Reference)
+                .IsUnique();
+
+            modelBuilder.Entity<UsageTransaction>()
+                .HasIndex(u => new { u.UserId, u.CreatedAtUtc });
+
+            modelBuilder.Entity<CreditTransaction>()
+                .HasIndex(c => c.UserId);
+        }
     }
 }

@@ -1,11 +1,14 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Pathly_Core;
 using Pathly_DTOs;
 using Pathly_Helper;
 using PathlyInterfaces.IService;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Pathly_Services
 {
@@ -13,12 +16,42 @@ namespace Pathly_Services
     {
         private readonly HttpClient _HttpClient;
         private readonly GroqSettings _GroqSettings;
+        private readonly ILogger<GroqService> _Logger;
+        private readonly List<GroqKeySettings> _AllKeys;
+
+        // Rotated on every request so consecutive calls start on different keys — this spreads
+        // each key's tokens-per-minute budget across the whole key pool instead of always
+        // hammering key 1 until it 429s and only then falling back.
+        private static int _KeyRotationIndex;
 
         public GroqService(HttpClient httpClient,
-                          IOptions<GroqSettings> groqSettings)
+                          IOptions<GroqSettings> groqSettings,
+                          ILogger<GroqService> logger)
         {
             _HttpClient = httpClient;
             _GroqSettings = groqSettings.Value;
+            _Logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _AllKeys = BuildKeyList(_GroqSettings);
+        }
+
+        private static List<GroqKeySettings> BuildKeyList(GroqSettings settings)
+        {
+            var keys = new List<GroqKeySettings>();
+
+            if (!string.IsNullOrWhiteSpace(settings.GroqApiKey))
+            {
+                keys.Add(new GroqKeySettings
+                {
+                    Name = "Primary",
+                    GroqApiKey = settings.GroqApiKey,
+                    BaseUrl = settings.BaseUrl,
+                    Model = settings.Model
+                });
+            }
+
+            keys.AddRange(settings.FallbackKeys);
+
+            return keys;
         }
 
         public async Task<AiResponseDto> AnalyzeAcademicRecordAsync(ExtractedAcademicRecordDto academicRecord, ApsResultDto apsResult)
@@ -42,9 +75,7 @@ namespace Pathly_Services
             // (academic record + APS + career evidence + psychometric profile) has any real size.
             var maxTokens = EstimateMaxTokens(systemPrompt, userPrompt, floorTokens: 800, ceilingTokens: 6500);
 
-            var responseBody = await CallGroqAsync(systemPrompt, userPrompt, maxTokens);
-
-            return ParseGroqResponse(responseBody);
+            return await CallGroqAsync(systemPrompt, userPrompt, maxTokens, ParseGroqResponse);
         }
 
         /// <summary>
@@ -68,9 +99,7 @@ namespace Pathly_Services
             // available" note on AnalyzeAcademicRecordAsync above for why that floor is lower there).
             var maxTokens = EstimateMaxTokens(systemPrompt, userPrompt, floorTokens: 1200, ceilingTokens: 4000);
 
-            var responseBody = await CallGroqAsync(systemPrompt, userPrompt, maxTokens);
-
-            return ParseExtractionResponse(responseBody);
+            return await CallGroqAsync(systemPrompt, userPrompt, maxTokens, ParseExtractionResponse);
         }
 
         // Groq's free/on_demand tier enforces a tokens-per-minute cap covering prompt +
@@ -101,46 +130,154 @@ namespace Pathly_Services
             return Math.Clamp(available, floorTokens, ceilingTokens);
         }
 
-        private async Task<string> CallGroqAsync(string systemPrompt, string userPrompt, int maxTokens)
+        // The free/on_demand tier also counts every call in the pipeline against one shared
+        // tokens-per-minute window PER KEY. CallGroqAsync therefore works the key pool like this:
+        //   1. Each request starts on a different key (round-robin, see _KeyRotationIndex) so
+        //      consecutive requests spread their TPM load across keys instead of concentrating
+        //      on the first one.
+        //   2. On a 429 (or an unusable/truncated response) it moves to the NEXT key immediately
+        //      rather than sleeping — a different key's TPM window is almost certainly still open.
+        //   3. Only after a full pass over every key does it wait out the longest rate-limit delay
+        //      Groq reported and try the key pool once more (skipping keys that failed with a
+        //      non-retryable error such as an invalid key).
+        private const int MaxKeyPoolPasses = 2;
+        private const int RateLimitRetryBufferSeconds = 2;
+
+        private async Task<TResponse> CallGroqAsync<TResponse>(
+            string systemPrompt,
+            string userPrompt,
+            int maxTokens,
+            Func<string, TResponse> parseResponse)
         {
-            var requestBody = new
+            var keys = _AllKeys
+                .Where(k => !string.IsNullOrWhiteSpace(k.GroqApiKey))
+                .ToList();
+
+            if (keys.Count == 0)
             {
-                model = _GroqSettings.Model,
-                max_tokens = maxTokens,
-                messages = new[]
-                {
-                    new
-                    {
-                        role = "system",
-                        content = systemPrompt
-                    },
-                    new
-                    {
-                        role = "user",
-                        content = userPrompt
-                    }
-                }
-            };
-
-            var json = JsonSerializer.Serialize(requestBody);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            _HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _GroqSettings.GroqApiKey);
-
-            var response = await _HttpClient.PostAsync(_GroqSettings.BaseUrl, content);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await response.Content.ReadAsStringAsync();
-
-                throw new HttpRequestException($"Groq API failed: {response.StatusCode} - {error}");
+                throw new HttpRequestException("No Groq API keys are configured.");
             }
 
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var startIndex = (int)((uint)Interlocked.Increment(ref _KeyRotationIndex) % keys.Count);
+            var lastError = string.Empty;
+            TimeSpan? rateLimitDelay = null;
+            var sawRetryableFailure = false;
+            var skippedKeys = new HashSet<string>();
 
-            Console.WriteLine(responseBody);
+            for (var pass = 0; pass < MaxKeyPoolPasses; pass++)
+            {
+                if (pass > 0)
+                {
+                    if (!sawRetryableFailure)
+                    {
+                        break;
+                    }
 
-            return responseBody;
+                    var delay = rateLimitDelay ?? TimeSpan.FromSeconds(30);
+                    _Logger.LogWarning(
+                        "All {KeyCount} Groq key(s) hit their rate limit or returned unusable content — waiting {Delay:0.#}s before one more pass.",
+                        keys.Count, delay.TotalSeconds);
+
+                    await Task.Delay(delay);
+                }
+
+                for (var offset = 0; offset < keys.Count; offset++)
+                {
+                    var keyIndex = (startIndex + offset) % keys.Count;
+                    var currentKey = keys[keyIndex];
+                    var keyName = string.IsNullOrWhiteSpace(currentKey.Name) ? $"Key {keyIndex + 1}" : currentKey.Name!;
+
+                    if (skippedKeys.Contains(keyName))
+                    {
+                        continue;
+                    }
+
+                    var baseUrl = string.IsNullOrWhiteSpace(currentKey.BaseUrl) ? _GroqSettings.BaseUrl : currentKey.BaseUrl;
+                    var model = string.IsNullOrWhiteSpace(currentKey.Model) ? _GroqSettings.Model : currentKey.Model;
+
+                    var requestBody = new
+                    {
+                        model = model,
+                        max_tokens = maxTokens,
+                        messages = new[]
+                        {
+                            new { role = "system", content = systemPrompt },
+                            new { role = "user", content = userPrompt }
+                        }
+                    };
+
+                    using var request = new HttpRequestMessage(HttpMethod.Post, baseUrl)
+                    {
+                        Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
+                    };
+
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", currentKey.GroqApiKey!.Trim());
+
+                    var response = await _HttpClient.SendAsync(request);
+                    var body = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        try
+                        {
+                            return parseResponse(body);
+                        }
+                        catch (Exception ex) when (ex is InvalidOperationException or JsonException)
+                        {
+                            // HTTP 200 but the content is truncated/unparsable — treat it like any
+                            // other failure and let the next key take the work.
+                            lastError = $"Groq key '{keyName}' returned unusable content: {ex.Message}";
+                            sawRetryableFailure = true;
+                            _Logger.LogWarning(lastError);
+                            continue;
+                        }
+                    }
+
+                    lastError = $"Groq API failed with key '{keyName}': {response.StatusCode} - {body}";
+
+                    if ((int)response.StatusCode == 429)
+                    {
+                        var delay = GetRateLimitRetryDelay(response, body);
+                        rateLimitDelay = rateLimitDelay is null || delay > rateLimitDelay ? delay : rateLimitDelay;
+                        sawRetryableFailure = true;
+
+                        _Logger.LogWarning(
+                            "Groq rate limit hit on key '{KeyName}' — moving to the next key ({Offset}/{KeyCount}).",
+                            keyName, offset + 1, keys.Count);
+
+                        continue;
+                    }
+
+                    _Logger.LogWarning(
+                        "Groq key '{KeyName}' failed with a non-retryable error ({StatusCode}) — skipping it for the rest of this request.",
+                        keyName, response.StatusCode);
+
+                    skippedKeys.Add(keyName);
+                }
+            }
+
+            throw new HttpRequestException($"All Groq API keys exhausted. Last error: {lastError}");
+        }
+
+        private static TimeSpan GetRateLimitRetryDelay(HttpResponseMessage response, string errorBody)
+        {
+            if (response.Headers.RetryAfter?.Delta is { } delta && delta > TimeSpan.Zero)
+            {
+                return delta.Add(TimeSpan.FromSeconds(RateLimitRetryBufferSeconds));
+            }
+
+            var match = Regex.Match(
+                errorBody,
+                @"try again in\s*([0-9]+(?:\.[0-9]+)?)\s*s",
+                RegexOptions.IgnoreCase);
+
+            if (match.Success &&
+                double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds))
+            {
+                return TimeSpan.FromSeconds(seconds + RateLimitRetryBufferSeconds);
+            }
+
+            return TimeSpan.FromSeconds(30);
         }
 
         private static string SanitizeJson(string json)
@@ -188,7 +325,7 @@ namespace Pathly_Services
             return sb.ToString();
         }
 
-        private static string ExtractCleanedJsonContent(string responseBody)
+        private string ExtractCleanedJsonContent(string responseBody)
         {
             using var doc = JsonDocument.Parse(responseBody);
 
@@ -197,7 +334,7 @@ namespace Pathly_Services
                 .GetProperty("finish_reason")
                 .GetString();
 
-            Console.WriteLine($"Finish Reason: {finishReason}");
+            _Logger.LogDebug("Groq finish reason: {FinishReason}", finishReason);
 
             var messageContent = doc
                 .RootElement

@@ -26,10 +26,8 @@ namespace Pathly_Services
         {
             if (subjects == null)
             {
-                throw new Exception("Subjects is null");
+                throw new ArgumentNullException(nameof(subjects));
             }
-
-            Console.WriteLine($"Subjects Count: {subjects.Count}");
 
             var result = new ApsResultDto();
 
@@ -81,7 +79,7 @@ namespace Pathly_Services
                 return "Excellent University Admission";
 
             if (aps >= 38)
-                return "Competitve University Admission";
+                return "Competitive University Admission";
 
             if (aps >= 30)
                 return "University Bachelor's Pass";
@@ -92,7 +90,7 @@ namespace Pathly_Services
             if (aps >= 18)
                 return "Higher Certificate Pass";
 
-            return "Doe not currently qualify for univeristy";
+            return "Does not currently qualify for university";
         }
 
         private int ConvertMarkToAPS(int mark)

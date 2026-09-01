@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.Extensions.Logging;
 using Pathly_Core.Unit;
 using Pathly_DTOs;
 using Pathly_Helper;
@@ -13,6 +14,8 @@ namespace Pathly_Services
     /// extraction/APS/subject-knowledge pipeline as Layer 1, but the cache key AND the AI prompt
     /// also incorporate the learner's exact psychometric profile (Part 13) — two learners with
     /// identical academics but different psychometrics never share a cached premium result.
+    /// Accepts either a fresh file upload or an already-extracted academic record id, and links
+    /// everything to the logged-in user when their account id is supplied.
     /// </summary>
     public class PremiumCareerAnalysisService : IPremiumCareerAnalysisService
     {
@@ -23,6 +26,7 @@ namespace Pathly_Services
         private readonly IGroqService _Groq;
         private readonly IMapper _Mapper;
         private readonly IUnitOfWork _Unit;
+        private readonly ILogger<PremiumCareerAnalysisService> _Logger;
 
         public PremiumCareerAnalysisService(IDocumentExtractionService extractionService,
                                     IApsCalculationService apsCalculation,
@@ -30,7 +34,8 @@ namespace Pathly_Services
                                     ICareerEvidenceService careerEvidence,
                                     IGroqService groq,
                                     IMapper mapper,
-                                    IUnitOfWork unit)
+                                    IUnitOfWork unit,
+                                    ILogger<PremiumCareerAnalysisService> logger)
         {
             _ExtractionService = extractionService ?? throw new ArgumentNullException(nameof(extractionService));
             _ApsCalculation = apsCalculation ?? throw new ArgumentNullException(nameof(apsCalculation));
@@ -39,6 +44,7 @@ namespace Pathly_Services
             _Groq = groq ?? throw new ArgumentNullException(nameof(groq));
             _Mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _Unit = unit ?? throw new ArgumentNullException(nameof(unit));
+            _Logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<AiResponseDto> AnalyzeWithPsychometricsAsync(string base64File, string mimeType, string? fileName, PsychometricProfileDto psychometricProfile)
@@ -50,9 +56,40 @@ namespace Pathly_Services
 
             var academicRecord = await _ExtractionService.ExtractAcademicRecordAsync(base64File, mimeType, fileName);
 
+            return await RunCombinedAnalysisAsync(academicRecord, psychometricProfile, applicationUserId: null);
+        }
+
+        public async Task<AiResponseDto> AnalyzeExistingRecordWithPsychometricsAsync(string extractionAcademicRecordId, string? applicationUserId, PsychometricProfileDto psychometricProfile)
+        {
+            if (string.IsNullOrWhiteSpace(extractionAcademicRecordId))
+            {
+                throw new ArgumentException("An extracted academic record id is required.", nameof(extractionAcademicRecordId));
+            }
+
+            if (psychometricProfile is null)
+            {
+                throw new ArgumentNullException(nameof(psychometricProfile));
+            }
+
+            if (!Guid.TryParse(extractionAcademicRecordId, out var extractionId))
+            {
+                throw new ArgumentException($"'{extractionAcademicRecordId}' is not a valid academic record id.", nameof(extractionAcademicRecordId));
+            }
+
+            var storedRecord = await _Unit.ExtractedAcademicRecord.GetByIdAsync(extractionId)
+                               ?? throw new KeyNotFoundException($"No previously uploaded academic record exists with id '{extractionAcademicRecordId}'. Upload your results first.");
+
+            var academicRecord = _Mapper.Map<ExtractedAcademicRecordDto>(storedRecord);
+
+            return await RunCombinedAnalysisAsync(academicRecord, psychometricProfile, applicationUserId);
+        }
+
+        /// <summary>Shared core for both entry points — everything after academic extraction.</summary>
+        private async Task<AiResponseDto> RunCombinedAnalysisAsync(ExtractedAcademicRecordDto academicRecord, PsychometricProfileDto psychometricProfile, string? applicationUserId)
+        {
             await PersistExtractedRecordAsync(academicRecord);
             await _SubjectKnowledge.EnsureSubjectsPersistedAsync(academicRecord.Subjects);
-            await PersistPsychometricProfileAsync(psychometricProfile);
+            await PersistPsychometricProfileAsync(psychometricProfile, applicationUserId);
 
             var apsResult = _ApsCalculation.CalculateAPS(academicRecord.Subjects);
 
@@ -144,9 +181,14 @@ namespace Pathly_Services
             await _Unit.AiResponse.AddAsync(llmResponse);
             await _Unit.SaveChangesAsync();
 
-            Console.WriteLine(servedFromCache
-                ? "Premium AI analysis served from the database cache — no LLM call made."
-                : "Premium AI analysis generated by LLM and cached for future identical academic + psychometric profiles.");
+            if (servedFromCache)
+            {
+                _Logger.LogInformation("Premium AI analysis served from the database cache — no LLM call made.");
+            }
+            else
+            {
+                _Logger.LogInformation("Premium AI analysis generated by LLM and cached for future identical academic + psychometric profiles.");
+            }
 
             return aiResponse;
         }
@@ -166,11 +208,30 @@ namespace Pathly_Services
             await _Unit.SaveChangesAsync();
         }
 
-        private async Task PersistPsychometricProfileAsync(PsychometricProfileDto profile)
+        private async Task PersistPsychometricProfileAsync(PsychometricProfileDto profile, string? applicationUserId)
         {
+            // Same learner with an identical score set? Reuse that row instead of duplicating —
+            // this is also what lets us know we can pull the cached analysis instead of paying
+            // for another LLM call.
+            var existing = await _Unit.PsychometricProfile.FindLatestMatchingForUserAsync(
+                applicationUserId ?? string.Empty,
+                profile.Realistic,
+                profile.Investigative,
+                profile.Artistic,
+                profile.Social,
+                profile.Enterprising,
+                profile.Conventional);
+
+            if (existing is not null)
+            {
+                profile.PsychometricProfileId = existing.PsychometricProfileId;
+                return;
+            }
+
             var entity = new PsychometricProfile
             {
                 PsychometricProfileId = profile.PsychometricProfileId == Guid.Empty ? Guid.NewGuid() : profile.PsychometricProfileId,
+                ApplicationUserId = string.IsNullOrWhiteSpace(applicationUserId) ? null : applicationUserId,
                 Realistic = profile.Realistic,
                 Investigative = profile.Investigative,
                 Artistic = profile.Artistic,
@@ -182,6 +243,8 @@ namespace Pathly_Services
 
             await _Unit.PsychometricProfile.AddAsync(entity);
             await _Unit.SaveChangesAsync();
+
+            profile.PsychometricProfileId = entity.PsychometricProfileId;
         }
 
         private async Task<(AiResponseDto Response, bool ServedFromCache)> GetAiResponseAsync(
@@ -206,13 +269,13 @@ namespace Pathly_Services
 
                     if (cachedResponse is not null)
                     {
-                        Console.WriteLine($"Premium cache hit for {subjectSetHash} — skipping the LLM call.");
+                        _Logger.LogDebug("Premium cache hit for {SubjectSetHash} — skipping the LLM call.", subjectSetHash);
                         return (cachedResponse, true);
                     }
                 }
                 catch (JsonException ex)
                 {
-                    Console.WriteLine($"Cached premium response for {subjectSetHash} could not be deserialized ({ex.Message}). Falling back to a live call.");
+                    _Logger.LogWarning(ex, "Cached premium response for {SubjectSetHash} could not be deserialized. Falling back to a live call.", subjectSetHash);
                 }
             }
 
