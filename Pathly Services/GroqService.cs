@@ -91,7 +91,23 @@ namespace Pathly_Services
                     continue;
                 }
 
-                if (keys.Any(k => k.Name == flat.Name || k.GroqApiKey == flat.GroqApiKey))
+                // A flat key may share a Name with a placeholder array entry from appsettings.json
+                // whose GroqApiKey is empty. Prefer the real key from configuration — replace the
+                // placeholder instead of skipping the real key as a "duplicate".
+                var matchingName = keys.FirstOrDefault(k => k.Name == flat.Name);
+                if (matchingName is not null)
+                {
+                    if (string.IsNullOrWhiteSpace(matchingName.GroqApiKey))
+                    {
+                        matchingName.GroqApiKey = flat.GroqApiKey;
+                        matchingName.BaseUrl = string.IsNullOrWhiteSpace(flat.BaseUrl) ? matchingName.BaseUrl : flat.BaseUrl;
+                        matchingName.Model = string.IsNullOrWhiteSpace(flat.Model) ? matchingName.Model : flat.Model;
+                    }
+
+                    continue;
+                }
+
+                if (keys.Any(k => k.GroqApiKey == flat.GroqApiKey))
                 {
                     continue;
                 }
