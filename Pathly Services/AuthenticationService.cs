@@ -43,13 +43,14 @@ namespace Pathly_Services
             var passwordHasher = new PasswordHasher<ApplicationUser>();
 
             var user = _Mapper.Map<ApplicationUser>(dto);
-
+ 
             user.Password = passwordHasher.HashPassword(user, dto.Password!);
-
+ 
             user.Id = Guid.NewGuid().ToString();
             user.CreatedAt = DateTime.UtcNow;
             user.UserName = dto.Email;
             user.PhoneNumber = dto.PhoneNumber;
+            user.FullName = dto.FullName;
 
             var result = await _UserManager.CreateAsync(user);
 
