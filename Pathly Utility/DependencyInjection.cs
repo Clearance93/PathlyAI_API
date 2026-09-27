@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using AutoMapper.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,8 +7,8 @@ using Pathly_Core;
 using Pathly_Core.Unit;
 using Pathly_Helper;
 using Pathly_Services;
-using PathlyInterfaces;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces;
+using Pathly_Interfaces.IService;
 using PathlyRepository;
 
 namespace Pathly_Utility
@@ -21,7 +21,7 @@ namespace Pathly_Utility
             services.AddHttpClient();
 
             // Typed clients: plain AddScoped<GroqService>()/AddScoped<AzureModelRouterService>()
-            // can't resolve a bare HttpClient constructor parameter — this is what actually
+            // can't resolve a bare HttpClient constructor parameter � this is what actually
             // gives each service a managed HttpClient instance.
             services.AddHttpClient<GroqService>();
             services.AddHttpClient<AzureModelRouterService>();
@@ -48,6 +48,13 @@ namespace Pathly_Utility
             services.Configure<AzureFoundrySettings>(configuratio.GetSection("AzureOpenAI"));
             services.Configure<CareerMatchWeightsOptions>(configuratio.GetSection("CareerMatchWeights"));
             services.Configure<PaystackSettings>(configuratio.GetSection("Paystack"));
+            services.Configure<SmtpSettings>(configuratio.GetSection("Smtp"));
+            services.Configure<AppSettings>(configuratio.GetSection("App"));
+            services.Configure<AuthSettings>(configuratio.GetSection("Auth"));
+
+            // Outbound email (password reset / email confirmation). Falls back to logging when
+            // SMTP is not configured, so auth flows still work in local/dev environments.
+            services.AddScoped<IEmailSender, SmtpEmailSender>();
 
             services.AddHttpClient<PaystackGateway>();
             services.AddScoped<IPaymentGatewayInterface>(sp => sp.GetRequiredService<PaystackGateway>());
@@ -83,10 +90,13 @@ namespace Pathly_Utility
             services.AddScoped<IApsCalculationService, ApsCalculationService>();
             services.AddScoped<ISubjectKnowledgeService, SubjectKnowledgeService>();
             services.AddScoped<ICareerEvidenceService, CareerEvidenceService>();
+            services.AddScoped<IAcademicPredictionService, AcademicPredictionService>();
             services.AddScoped<IBehavioralSignalService, NoOpBehavioralSignalService>();
             services.AddScoped<IPsychometricService, PsychometricService>();
+            services.AddScoped<IAnalysisQueryService, AnalysisQueryService>();
+            services.AddScoped<IAccountService, AccountService>();
 
-            // Groq-only for now (Azure AI Foundry temporarily disabled — everything Azure-related
+            // Groq-only for now (Azure AI Foundry temporarily disabled � everything Azure-related
             // is left in place below, untouched, so this is a one-line flip back to
             // ResilientCareerAiService whenever Azure is wanted again).
             services.AddScoped<IPrimaryCareerAiProvider>(sp => sp.GetRequiredService<GroqService>());
@@ -94,7 +104,7 @@ namespace Pathly_Utility
             services.AddScoped<IGroqService>(sp => sp.GetRequiredService<GroqService>());
 
             // Document extraction structuring: Groq only, by design (Part: free document
-            // extraction). No Azure fallback here — unlike career analysis, this step is cheap
+            // extraction). No Azure fallback here � unlike career analysis, this step is cheap
             // and low-stakes enough that we accept occasional retries rather than paying for a
             // paid fallback provider. Wrapped in self-validation/retry so a hallucinated or
             // incomplete extraction gets a second (and third) attempt before it's trusted.

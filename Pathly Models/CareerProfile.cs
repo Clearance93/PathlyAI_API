@@ -1,10 +1,10 @@
-ï»¿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Pathly_Models
 {
     /// <summary>
-    /// Deterministic career knowledge base entry (Part 9/10/15). This is Pathly's own data â€”
-    /// not an LLM output â€” used to compute explainable evidence for a learner before any AI
+    /// Deterministic career knowledge base entry (Part 9/10/15). This is Pathly's own data —
+    /// not an LLM output — used to compute explainable evidence for a learner before any AI
     /// call is made. See <see cref="Pathly_DTOs.CareerEvidenceDto"/> for the computed result.
     /// </summary>
     public class CareerProfile

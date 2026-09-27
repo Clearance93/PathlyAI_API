@@ -1,4 +1,4 @@
-﻿using Pathly_DTOs;
+using Pathly_DTOs;
 using Pathly_Helper;
 using Xunit;
 
@@ -105,7 +105,7 @@ namespace Pathly_Tests
             {
                 Subjects = new List<ExtractedSubjectDto>
                 {
-                    new() { SubjectName = "Subject 1", NumericMark = 61, MarkType = "Percentage" }
+                    new() { SubjectName = "Mathematics", NumericMark = 61, MarkType = "Percentage" }
                 }
             };
 
@@ -118,7 +118,7 @@ namespace Pathly_Tests
         [Fact]
         public void SmallDocument_DoesNotTriggerCoverageWarning()
         {
-            // Below the 6-line threshold — shouldn't fire the heuristic at all.
+            // Below the 6-line threshold � shouldn't fire the heuristic at all.
             var rawText = "Mathematics 78%\nPhysical Sciences 65%";
 
             var record = new ExtractedAcademicRecordDto

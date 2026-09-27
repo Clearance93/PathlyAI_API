@@ -1,8 +1,22 @@
-﻿namespace Pathly_Models
+namespace Pathly_Models
 {
     public class AiResponse
     {
         public Guid AiResponseId { get; set; }
+
+        /// <summary>
+        /// Id of the ApplicationUser whose account owns this analysis. Null only for legacy rows
+        /// written before user ownership existed. Every read path must filter on this so one
+        /// learner can never be served another learner's stored results.
+        /// </summary>
+        public string? ApplicationUserId { get; set; }
+
+        /// <summary>The extracted academic record this analysis was produced from, so a stored
+        /// result can be re-opened or combined with a later psychometric assessment.</summary>
+        public Guid? ExtractionAcademicRecordId { get; set; }
+
+        /// <summary>Human-readable label of the academic block (term/final) that drove this analysis.</summary>
+        public string? DriverTermLabel { get; set; }
 
         public string? UserFullName { get; set; }
 
@@ -18,12 +32,12 @@
         /// <summary>
         /// SHA-256 fingerprint of the normalized subject/mark set (+ study level) that produced this
         /// response. Used to serve repeat requests for the same academic record straight from the
-        /// database instead of paying for another LLM call. Not a security hash — just a cache key.
+        /// database instead of paying for another LLM call. Not a security hash � just a cache key.
         /// </summary>
         public string? SubjectSetHash { get; set; }
 
         /// <summary>
-        /// Only set on premium (Layer 2) analyses — the exact fingerprint of the psychometric
+        /// Only set on premium (Layer 2) analyses � the exact fingerprint of the psychometric
         /// profile used, so identical-academics-but-different-psychometrics learners never
         /// share a cache entry (Part 13).
         /// </summary>

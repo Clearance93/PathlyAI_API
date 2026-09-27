@@ -1,4 +1,4 @@
-﻿namespace Pathly_DTOs
+namespace Pathly_DTOs
 {
     public class CareerMatchDto
     {

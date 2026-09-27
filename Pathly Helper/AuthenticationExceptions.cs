@@ -27,4 +27,17 @@ namespace Pathly_Helper
             LockoutEnd = lockoutEnd;
         }
     }
+
+    /// <summary>
+    /// Thrown when a login attempt is valid but the account's email address has not been
+    /// confirmed and the deployment requires confirmation. Callers should map this to a
+    /// "verify your email" response rather than a generic failure.
+    /// </summary>
+    public class EmailNotConfirmedException : Exception
+    {
+        public EmailNotConfirmedException(string message)
+            : base(message)
+        {
+        }
+    }
 }

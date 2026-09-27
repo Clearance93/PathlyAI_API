@@ -1,8 +1,8 @@
-﻿namespace Pathly_DTOs
+namespace Pathly_DTOs
 {
     public class UniversityQualificationDto
     {
-        public Guid UnviversityQualificationId { get; set; }
+        public Guid UniversityQualificationId { get; set; }
 
         public string? Name { get; set; }
 

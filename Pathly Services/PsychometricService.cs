@@ -3,7 +3,7 @@ using Pathly_Core.Unit;
 using Pathly_DTOs;
 using Pathly_Helper;
 using Pathly_Models;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 using System.Text.Json;
 
 namespace Pathly_Services

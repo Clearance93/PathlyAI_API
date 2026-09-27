@@ -2,7 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Pathly_DTOs;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 
 namespace PathlyAI_API.Controllers
 {

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Pathly_Models;
 
@@ -10,7 +10,7 @@ namespace Pathly_Data
         {
         }
 
-        public DbSet<UniveristyQualification> UniveristyQualifications { get; set; }
+        public DbSet<UniversityQualification> UniversityQualifications { get; set; }
 
         public DbSet<AiResponse> AiResponse { get; set; }
 
@@ -24,11 +24,13 @@ namespace Pathly_Data
 
         public DbSet<DemandingCareerAssessment> DemandingCareerAssessments { get; set; }
 
-        public DbSet<CareerMatch> CareerMaths { get; set; }
+        public DbSet<CareerMatch> CareerMatches { get; set; }
 
-        public DbSet<ApsAnalysis> ApsAnalysiss { get; set; }
+        public DbSet<ApsAnalysis> ApsAnalyses { get; set; }
 
         public DbSet<ExtractedAcademicRecord> ExtractedAcademicRecords { get; set; }
+
+        public DbSet<AcademicPeriod> AcademicPeriods { get; set; }
 
         public DbSet<ExtractedSubject> ExtractedSubjects { get; set; }
 
@@ -54,7 +56,7 @@ namespace Pathly_Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // A learner owns many psychometric profiles (one per distinct score set) — removing
+            // A learner owns many psychometric profiles (one per distinct score set) � removing
             // the account must not silently delete their assessment history, so no cascade.
             modelBuilder.Entity<PsychometricProfile>()
                 .HasOne(p => p.ApplicationUser)
@@ -90,6 +92,50 @@ namespace Pathly_Data
 
             modelBuilder.Entity<CreditTransaction>()
                 .HasIndex(c => c.UserId);
+
+            // Extracted records may (optionally) be bound to the uploading account. Deleting an
+            // account keeps the academic record row (SetNull) so a learner's analysis history is
+            // not silently destroyed when the account goes away.
+            modelBuilder.Entity<ExtractedAcademicRecord>()
+                .HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(r => r.ApplicationUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // An analysis result belongs to exactly one account. Deleting the account keeps the
+            // row (SetNull) so aggregate/reporting data is not destroyed, but every read path
+            // filters on ApplicationUserId — a logged-in learner can only ever see their own.
+            modelBuilder.Entity<AiResponse>()
+                .HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(r => r.ApplicationUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<AiResponse>()
+                .HasIndex(r => new { r.ApplicationUserId, r.AddedAt });
+
+            // Academic periods are children of their record; their subject children are removed
+            // with the period. Period rows are the persisted term history of an uploaded report.
+            modelBuilder.Entity<AcademicPeriod>()
+                .HasOne(p => p.ExtractedAcademicRecord)
+                .WithMany(r => r.AcademicPeriods)
+                .HasForeignKey(p => p.ExtractedAcademicRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AcademicPeriod>()
+                .HasIndex(p => new { p.ExtractedAcademicRecordId, p.Ordinal });
+
+            // Term-block subjects live under their AcademicPeriod. Period-owned subjects carry
+            // TermOrdinal/TermLabel/IsFinal so the driver/period metadata is lossless per subject.
+            modelBuilder.Entity<AcademicPeriod>()
+                .HasMany(p => p.Subjects)
+                .WithOne(s => s.AcademicPeriod)
+                .HasForeignKey(s => s.AcademicPeriodId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Legacy direct record->subjects relationship is preserved by convention via the
+            // existing shadow FK (ExtractedAcademicRecordExtractionAcademicRecordId). New
+            // multi-term records persist their subjects under AcademicPeriods instead.
         }
     }
 }

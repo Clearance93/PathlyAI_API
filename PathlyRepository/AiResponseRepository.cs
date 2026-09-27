@@ -1,7 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Pathly_Data;
 using Pathly_Models;
-using PathlyInterfaces;
+using Pathly_Interfaces;
 
 namespace PathlyRepository
 {
@@ -25,6 +25,35 @@ namespace PathlyRepository
                 .Where(r => r.SubjectSetHash == subjectSetHash)
                 .OrderByDescending(r => r.AddedAt)
                 .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<AiResponse>> GetHistoryForUserAsync(string applicationUserId, int take = 100)
+        {
+            if (string.IsNullOrWhiteSpace(applicationUserId))
+            {
+                return new List<AiResponse>();
+            }
+
+            return await _Context.AiResponse
+                .AsNoTracking()
+                .Include(r => r.ApsAnalysis)
+                .Where(r => r.ApplicationUserId == applicationUserId)
+                .OrderByDescending(r => r.AddedAt)
+                .Take(take)
+                .ToListAsync();
+        }
+
+        public async Task<AiResponse?> GetByIdForUserAsync(Guid aiResponseId, string applicationUserId)
+        {
+            if (aiResponseId == Guid.Empty || string.IsNullOrWhiteSpace(applicationUserId))
+            {
+                return null;
+            }
+
+            return await _Context.AiResponse
+                .AsNoTracking()
+                .Include(r => r.ApsAnalysis)
+                .FirstOrDefaultAsync(r => r.AiResponseId == aiResponseId && r.ApplicationUserId == applicationUserId);
         }
     }
 }

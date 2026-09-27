@@ -1,4 +1,4 @@
-﻿namespace Pathly_Enums
+namespace Pathly_Enums
 {
     public enum AuthProviders
     {

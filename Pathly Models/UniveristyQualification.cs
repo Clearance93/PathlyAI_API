@@ -1,12 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.Runtime.InteropServices;
 
 namespace Pathly_Models
 {
-    public class UniveristyQualification
+    public class UniversityQualification
     {
         [Key]
-        public Guid UnviversityQualificationId { get; set; }
+        public Guid UniversityQualificationId { get; set; }
 
         public string? Name { get; set; }
 

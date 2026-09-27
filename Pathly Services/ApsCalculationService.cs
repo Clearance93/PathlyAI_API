@@ -1,28 +1,28 @@
-ï»¿using AutoMapper;
-using Pathly_Core.Unit;
 using Pathly_DTOs;
-using PathlyInterfaces.IService;
+using Pathly_Helper;
+using Pathly_Interfaces.IService;
 
 namespace Pathly_Services
 {
     public class ApsCalculationService : IApsCalculationService
     {
-        private readonly IUnitOfWork _Unit;
-        private readonly IMapper _Mapper;
-
         private static readonly string[] ExcludedFromAps =
         {
             "life orientation"
         };
 
-        public ApsCalculationService(IUnitOfWork unit,
-                                     IMapper mapper)
+        public ApsCalculationService()
         {
-            _Unit = unit ?? throw new ArgumentNullException(nameof(unit));
-            _Mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
 
         public ApsResultDto CalculateAPS(List<ExtractedSubjectDto> subjects)
+        {
+            // Preserve legacy single-document behaviour: a flat subject list is treated as a
+            // final/overall snapshot (no qualification gating).
+            return CalculateAPS(subjects, isFinal: true, isTertiaryOrAdult: false, studyLevel: null);
+        }
+
+        public ApsResultDto CalculateAPS(List<ExtractedSubjectDto> subjects, bool isFinal, bool isTertiaryOrAdult, string? studyLevel)
         {
             if (subjects == null)
             {
@@ -57,9 +57,31 @@ namespace Pathly_Services
 
             result.Distinctions = subjects.Count(x => (x.NumericMark ?? 0) >= 80);
 
-            result.QualificationLevel = GetQualification(result.TotalAps);
+            // A non-final (mid-year) or non-final-year driver is "current standing — indicative",
+            // never an administrative qualification verdict. Only a final block on a final-year
+            // (Gr 12 NSC) report may drive hard qualification language.
+            result.QualificationLevel = isFinal && !isTertiaryOrAdult && IsFinalYearStudyLevel(studyLevel)
+                ? GetQualification(result.TotalAps)
+                : GetIndicativeStanding(result.TotalAps);
 
             return result;
+        }
+
+        private static bool IsFinalYearStudyLevel(string? studyLevel)
+        {
+            if (string.IsNullOrWhiteSpace(studyLevel))
+            {
+                return false;
+            }
+
+            // "Grade 12", "Gr 12", "Matric", "NSC" => final-year secondary.
+            var level = SubjectNormalizer.Normalize(studyLevel);
+            return level == "grade 12"
+                || level == "gr 12"
+                || level == "matric"
+                || level == "nsc"
+                || level.StartsWith("grade 12", StringComparison.Ordinal)
+                || level.StartsWith("gr 12", StringComparison.Ordinal);
         }
 
         private static bool IsExcludedFromAps(string? subjectName)
@@ -91,6 +113,30 @@ namespace Pathly_Services
                 return "Higher Certificate Pass";
 
             return "Does not currently qualify for university";
+        }
+
+        /// <summary>
+        /// Mid-year/non-final-year standing. The numeric APS is still meaningful as a current
+        /// snapshot, but the wording deliberately avoids an administrative qualification verdict.
+        /// </summary>
+        private string GetIndicativeStanding(int aps)
+        {
+            if (aps >= 42)
+                return "Indicative standing: tracking toward Excellent University Admission (final year results will confirm)";
+
+            if (aps >= 38)
+                return "Indicative standing: tracking toward Competitive University Admission (final year results will confirm)";
+
+            if (aps >= 30)
+                return "Indicative standing: tracking toward a University Bachelor's Pass (final year results will confirm)";
+
+            if (aps >= 24)
+                return "Indicative standing: tracking toward a Diploma Pass (final year results will confirm)";
+
+            if (aps >= 18)
+                return "Indicative standing: tracking toward a Higher Certificate Pass (final year results will confirm)";
+
+            return "Indicative current standing only — this is a mid-year/non-final snapshot and is not an admission verdict. The final year-end results determine university eligibility.";
         }
 
         private int ConvertMarkToAPS(int mark)
@@ -127,10 +173,10 @@ namespace Pathly_Services
 
         public string GetApsExplanation(int aps)
         {
-            if (aps >= 30) return $"APS {aps} â€” Qualifies for most university programmes.";
-            if (aps >= 20) return $"APS {aps} â€” Qualifies for some diploma and certificate programmes.";
+            if (aps >= 30) return $"APS {aps} — Qualifies for most university programmes.";
+            if (aps >= 20) return $"APS {aps} — Qualifies for some diploma and certificate programmes.";
 
-            return $"APS {aps} â€” May need to consider bridging courses or upgrading subjects.";
+            return $"APS {aps} — May need to consider bridging courses or upgrading subjects.";
         }
     }
 }

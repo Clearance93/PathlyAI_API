@@ -1,14 +1,14 @@
-ï»¿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Pathly_DTOs;
 using Pathly_Helper;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 
 namespace Pathly_Services
 {
     /// <summary>
     /// Wraps a raw <see cref="IDocumentStructuringService"/> (Groq) with deterministic validation
-    /// and retry. Groq is non-deterministic, so a re-ask genuinely can produce a better result â€”
+    /// and retry. Groq is non-deterministic, so a re-ask genuinely can produce a better result —
     /// this retries on validation failure up to <see cref="_maxAttempts"/> times, and if it's
     /// still not clean after that, returns the best attempt with
     /// <see cref="ExtractedAcademicRecordDto.NeedsManualReview"/> set rather than throwing or
@@ -81,7 +81,7 @@ namespace Pathly_Services
                 _logger.LogWarning("Extraction attempt {Attempt}/{MaxAttempts} failed validation: {FailureReason}", attempt, _maxAttempts, lastFailureReason);
             }
 
-            // Exhausted retries â€” hand back the best available result rather than failing the
+            // Exhausted retries — hand back the best available result rather than failing the
             // whole upload, but make the uncertainty explicit so it isn't trusted silently. If
             // every attempt threw (no successful structuring at all), fall back to an empty
             // record so the caller still gets a well-formed DTO instead of an exception.

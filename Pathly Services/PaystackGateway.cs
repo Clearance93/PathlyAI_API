@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pathly_Core;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 using Pathly_Models;
 using System.Security.Cryptography;
 using System.Text;

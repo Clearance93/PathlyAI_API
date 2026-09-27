@@ -1,4 +1,4 @@
-﻿namespace Pathly_Core
+namespace Pathly_Core
 {
     public class GroqSettings
     {

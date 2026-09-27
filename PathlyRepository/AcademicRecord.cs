@@ -1,5 +1,5 @@
-﻿using Pathly_Data;
-using PathlyInterfaces;
+using Pathly_Data;
+using Pathly_Interfaces;
 
 namespace PathlyRepository
 {

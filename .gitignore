@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Command Code tooling local settings (may contain local permissions/credentials)
+.commandcode/settings.json

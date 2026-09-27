@@ -1,7 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Pathly_Data;
 using Pathly_Models;
-using PathlyInterfaces;
+using Pathly_Interfaces;
 
 namespace PathlyRepository
 {
@@ -21,36 +21,41 @@ namespace PathlyRepository
                 return null;
             }
 
-            return await _Context.PsychometricProfiles
-                .Where(p => p.ApplicationUserId == applicationUserId)
-                .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync();
+            return await _Context.PsychometricProfiles.Where(p => p.ApplicationUserId == applicationUserId)
+                                                      .OrderByDescending(p => p.CreatedAt)
+                                                      .FirstOrDefaultAsync();
         }
 
-        public async Task<PsychometricProfile?> FindLatestMatchingForUserAsync(
-            string applicationUserId,
-            int realistic,
-            int investigative,
-            int artistic,
-            int social,
-            int enterprising,
-            int conventional)
+        public async Task<PsychometricProfile?> FindLatestMatchingForUserAsync(string applicationUserId, int realistic, int investigative, int artistic, int social, int enterprising, int conventional)
         {
             if (string.IsNullOrWhiteSpace(applicationUserId))
             {
                 return null;
             }
 
+            return await _Context.PsychometricProfiles.Where(p => p.ApplicationUserId == applicationUserId &&
+                                                                  p.Realistic == realistic &&
+                                                                  p.Investigative == investigative &&
+                                                                  p.Artistic == artistic &&
+                                                                  p.Social == social &&
+                                                                  p.Enterprising == enterprising &&
+                                                                  p.Conventional == conventional)
+                                                      .OrderByDescending(p => p.CreatedAt)
+                                                      .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<PsychometricProfile>> GetAllForUserAsync(string applicationUserId)
+        {
+            if (string.IsNullOrWhiteSpace(applicationUserId))
+            {
+                return new List<PsychometricProfile>();
+            }
+
             return await _Context.PsychometricProfiles
-                .Where(p => p.ApplicationUserId == applicationUserId &&
-                            p.Realistic == realistic &&
-                            p.Investigative == investigative &&
-                            p.Artistic == artistic &&
-                            p.Social == social &&
-                            p.Enterprising == enterprising &&
-                            p.Conventional == conventional)
+                .AsNoTracking()
+                .Where(p => p.ApplicationUserId == applicationUserId)
                 .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
         }
     }
 }

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Pathly_Data;
 using Pathly_Models;
-using PathlyInterfaces;
+using Pathly_Interfaces;
 
 namespace PathlyRepository
 {
@@ -47,6 +47,21 @@ namespace PathlyRepository
             return await _Context.PsychometricAssessments
                 .Include(a => a.PsychometricProfile)
                 .FirstOrDefaultAsync(a => a.PsychometricAssessmentId == psychometricAssessmentId);
+        }
+
+        public async Task<List<PsychometricAssessment>> GetAllForUserAsync(string applicationUserId)
+        {
+            if (string.IsNullOrWhiteSpace(applicationUserId))
+            {
+                return new List<PsychometricAssessment>();
+            }
+
+            return await _Context.PsychometricAssessments
+                .AsNoTracking()
+                .Include(a => a.PsychometricProfile)
+                .Where(a => a.ApplicationUserId == applicationUserId)
+                .OrderByDescending(a => a.CompletedAt)
+                .ToListAsync();
         }
     }
 }

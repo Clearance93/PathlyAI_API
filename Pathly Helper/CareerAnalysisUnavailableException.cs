@@ -1,4 +1,4 @@
-﻿namespace Pathly_Helper
+namespace Pathly_Helper
 {
     /// <summary>
     /// Thrown when both Groq and the Azure Model Router fail or return an unusable response

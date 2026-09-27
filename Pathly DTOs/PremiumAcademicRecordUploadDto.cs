@@ -1,7 +1,7 @@
-﻿namespace Pathly_DTOs
+namespace Pathly_DTOs
 {
     /// <summary>
-    /// Request shape for the premium (Layer 2) endpoint — the same file upload as
+    /// Request shape for the premium (Layer 2) endpoint � the same file upload as
     /// <see cref="AcademicRecordUploadDto"/> plus the learner's psychometric profile.
     /// </summary>
     public class PremiumAcademicRecordUploadDto

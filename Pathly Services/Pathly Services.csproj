@@ -17,7 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Pathly Core\Pathly Core.csproj" />
     <ProjectReference Include="..\Pathly Helper\Pathly Helper.csproj" />
-    <ProjectReference Include="..\PathlyInterfaces\PathlyInterfaces.csproj" />
+    <ProjectReference Include="..\Pathly_Interfaces\Pathly_Interfaces.csproj" />
   </ItemGroup>
 
 </Project>

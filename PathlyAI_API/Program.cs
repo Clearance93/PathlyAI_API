@@ -1,6 +1,9 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Pathly_Data;
@@ -59,6 +62,18 @@ builder.Services
         };
     });
 
+// AddIdentity() registers its cookie scheme and can override the JWT defaults set above, which
+// makes plain [Authorize] challenge via a 307 redirect to /Account/Login instead of returning a
+// JWT 401. Pinning the DEFAULT AUTHORIZATION POLICY to the JWT bearer scheme forces every
+// [Authorize] endpoint to authenticate with Bearer tokens regardless of the Identity cookie
+// registration — the API is token-only and has no cookie login flow.
+builder.Services.AddAuthorization(options =>
+{
+    options.DefaultPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
 static string GetJwtKey(ConfigurationManager configuration)
 {
     var key = configuration["Jwt:Key"];
@@ -89,6 +104,23 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+
+// Throttle the anonymous auth endpoints so scripted signup/login/password-reset floods can't
+// hammer the database. Partitioned per client IP with a modest fixed window.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("auth", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
 
 builder.Services.AddOpenApi();
 
@@ -142,6 +174,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors("AllowedOrigins");
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 

@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Pathly_Data;
 using Pathly_Enums;
 using Pathly_Models;
-using PathlyInterfaces;
+using Pathly_Interfaces;
 
 namespace PathlyRepository
 {
@@ -19,9 +19,8 @@ namespace PathlyRepository
         {
             var types = usageTypes.ToList();
 
-            return await _Context.UsageTransactions
-                .Where(u => u.UserId == userId && types.Contains(u.UsageType) && u.CreatedAtUtc >= sinceUtc)
-                .SumAsync(u => (int?)u.Units) ?? 0;
+            return await _Context.UsageTransactions.Where(u => u.UserId == userId && types.Contains(u.UsageType) && u.CreatedAtUtc >= sinceUtc)
+                                                   .SumAsync(u => (int?)u.Units) ?? 0;
         }
     }
 }

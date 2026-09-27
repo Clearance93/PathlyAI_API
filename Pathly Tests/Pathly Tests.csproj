@@ -18,7 +18,7 @@
     <ProjectReference Include="..\Pathly DTOs\Pathly DTOs.csproj" />
     <ProjectReference Include="..\Pathly Helper\Pathly Helper.csproj" />
     <ProjectReference Include="..\Pathly Services\Pathly Services.csproj" />
-    <ProjectReference Include="..\PathlyInterfaces\PathlyInterfaces.csproj" />
+    <ProjectReference Include="..\Pathly_Interfaces\Pathly_Interfaces.csproj" />
   </ItemGroup>
 
 </Project>

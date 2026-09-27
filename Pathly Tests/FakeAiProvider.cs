@@ -1,5 +1,5 @@
-﻿using Pathly_DTOs;
-using PathlyInterfaces.IService;
+using Pathly_DTOs;
+using Pathly_Interfaces.IService;
 
 namespace Pathly_Tests
 {
@@ -47,7 +47,7 @@ namespace Pathly_Tests
 
         public static AiResponseDto UnusableResponse()
         {
-            // No Summary and no ApsAnalysis — matches ResilientCareerAiService's "unusable" check.
+            // No Summary and no ApsAnalysis � matches ResilientCareerAiService's "unusable" check.
             return new AiResponseDto();
         }
     }

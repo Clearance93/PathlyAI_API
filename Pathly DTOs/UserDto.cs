@@ -1,4 +1,4 @@
-﻿using Pathly_Enums;
+using Pathly_Enums;
 
 namespace Pathly_DTOs
 {
@@ -10,7 +10,7 @@ namespace Pathly_DTOs
 
         public string? Password { get; set; }
 
-        public string? ProofilePictures { get; set; }
+        public string? ProfilePictures { get; set; }
 
         public string? Email { get; set; }
 
@@ -25,5 +25,11 @@ namespace Pathly_DTOs
         public string? Subscription { get; set; }
 
         public DateTime? CreatedAt { get; set; }
+
+        /// <summary>Registration-time acceptance of the Terms of Service and Privacy Policy (required).</summary>
+        public bool AcceptTerms { get; set; }
+
+        /// <summary>Registration-time opt-in to marketing communications (optional, never implied).</summary>
+        public bool MarketingConsent { get; set; }
     }
 }

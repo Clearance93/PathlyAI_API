@@ -1,4 +1,4 @@
-﻿namespace Pathly_Helper
+namespace Pathly_Helper
 {
     /// <summary>
     /// Single source of truth for turning a raw string (subject name, study level, mark type,

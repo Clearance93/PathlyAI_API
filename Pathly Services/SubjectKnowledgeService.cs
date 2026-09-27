@@ -1,14 +1,14 @@
-﻿using Pathly_Core.Unit;
+using Pathly_Core.Unit;
 using Pathly_DTOs;
 using Pathly_Helper;
 using Pathly_Models;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 
 namespace Pathly_Services
 {
     /// <summary>
     /// The reusable subject knowledge layer (Part 2/15). This is deliberately separate from
-    /// personalized analysis caching — knowing "Mathematics" already exists in the database
+    /// personalized analysis caching � knowing "Mathematics" already exists in the database
     /// says nothing about what career analysis any particular Mathematics learner should get.
     /// </summary>
     public class SubjectKnowledgeService : ISubjectKnowledgeService

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Pathly_DTOs;
 using Pathly_Enums;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 
 namespace PathlyAI_API.Controllers
 {
@@ -33,18 +33,33 @@ namespace PathlyAI_API.Controllers
         {
             var userId = User.FindFirstValue("extension_userId");
 
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return Unauthorized(new { message = "A valid access token is required." });
+            }
+
             try
             {
-                await _Billing.EnsureWithinQuotaAsync(userId ?? string.Empty, UsageType.PsychometricSubmission);
+                await _Billing.EnsureWithinQuotaAsync(userId, UsageType.PsychometricSubmission);
 
-                if (submission is null || string.IsNullOrWhiteSpace(submission.UserId))
+                if (submission is null)
                 {
-                    return BadRequest(new { message = "The id of the logged-in user is required to store an assessment." });
+                    return BadRequest(new { message = "An assessment submission is required." });
                 }
+
+                // The owning account is taken from the token — never from the request body — so
+                // one learner can never store an assessment against another learner's account.
+                if (!string.IsNullOrWhiteSpace(submission.UserId) &&
+                    !string.Equals(submission.UserId, userId, StringComparison.Ordinal))
+                {
+                    return Forbid();
+                }
+
+                submission.UserId = userId;
 
                 var stored = await _PsychometricService.SubmitAssessmentAsync(submission);
 
-                await _Billing.RecordUsageAsync(userId ?? string.Empty, UsageType.PsychometricSubmission);
+                await _Billing.RecordUsageAsync(userId, UsageType.PsychometricSubmission);
 
                 return Ok(stored);
             }
@@ -67,20 +82,22 @@ namespace PathlyAI_API.Controllers
             }
         }
 
-        /// <summary>Returns the user's most recent stored assessment and profile, if one exists.</summary>
-        [HttpGet("assessment/{userId}")]
-        public async Task<IActionResult> GetLatestAssessment(string userId)
+        /// <summary>Returns the logged-in user's most recent stored assessment and profile, if one exists.</summary>
+        [HttpGet("assessment/me")]
+        public async Task<IActionResult> GetLatestAssessment()
         {
+            var userId = User.FindFirstValue("extension_userId");
+
             if (string.IsNullOrWhiteSpace(userId))
             {
-                return BadRequest(new { message = "A user id is required." });
+                return Unauthorized(new { message = "A valid access token is required." });
             }
 
             var latest = await _PsychometricService.GetLatestForUserAsync(userId);
 
             if (latest is null)
             {
-                return NotFound(new { message = $"No stored psychometric assessment exists for user '{userId}' yet." });
+                return NotFound(new { message = "No stored psychometric assessment exists for your account yet." });
             }
 
             return Ok(latest);

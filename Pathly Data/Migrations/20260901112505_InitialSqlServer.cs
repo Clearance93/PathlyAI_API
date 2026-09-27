@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -48,7 +48,7 @@ namespace Pathly_Data.Migrations
                     Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     FullName = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Password = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ProofilePictures = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ProfilePictures = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     AuthProvider = table.Column<int>(type: "int", nullable: false),
                     GoogleId = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     MicrosoftId = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -172,10 +172,10 @@ namespace Pathly_Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "UniveristyQualifications",
+                name: "UniversityQualifications",
                 columns: table => new
                 {
-                    UnviversityQualificationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UniversityQualificationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     MinimumAPS = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -185,7 +185,7 @@ namespace Pathly_Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_UniveristyQualifications", x => x.UnviversityQualificationId);
+                    table.PrimaryKey("PK_UniversityQualifications", x => x.UniversityQualificationId);
                 });
 
             migrationBuilder.CreateTable(
@@ -386,7 +386,7 @@ namespace Pathly_Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ApsAnalysiss",
+                name: "ApsAnalyses",
                 columns: table => new
                 {
                     ApsAnalysisId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
@@ -402,9 +402,9 @@ namespace Pathly_Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ApsAnalysiss", x => x.ApsAnalysisId);
+                    table.PrimaryKey("PK_ApsAnalyses", x => x.ApsAnalysisId);
                     table.ForeignKey(
-                        name: "FK_ApsAnalysiss_ImprovementAdvices_ImprovementAdviceId",
+                        name: "FK_ApsAnalyses_ImprovementAdvices_ImprovementAdviceId",
                         column: x => x.ImprovementAdviceId,
                         principalTable: "ImprovementAdvices",
                         principalColumn: "ImprovementAdviceId");
@@ -545,15 +545,15 @@ namespace Pathly_Data.Migrations
                 {
                     table.PrimaryKey("PK_AiResponse", x => x.AiResponseId);
                     table.ForeignKey(
-                        name: "FK_AiResponse_ApsAnalysiss_ApsAnalysisId",
+                        name: "FK_AiResponse_ApsAnalyses_ApsAnalysisId",
                         column: x => x.ApsAnalysisId,
-                        principalTable: "ApsAnalysiss",
+                        principalTable: "ApsAnalyses",
                         principalColumn: "ApsAnalysisId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
-                name: "CareerMaths",
+                name: "CareerMatches",
                 columns: table => new
                 {
                     CareerMatchId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
@@ -573,9 +573,9 @@ namespace Pathly_Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_CareerMaths", x => x.CareerMatchId);
+                    table.PrimaryKey("PK_CareerMatches", x => x.CareerMatchId);
                     table.ForeignKey(
-                        name: "FK_CareerMaths_AiResponse_AiResponseId",
+                        name: "FK_CareerMatches_AiResponse_AiResponseId",
                         column: x => x.AiResponseId,
                         principalTable: "AiResponse",
                         principalColumn: "AiResponseId");
@@ -702,8 +702,8 @@ namespace Pathly_Data.Migrations
                 column: "ApsAnalysisId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ApsAnalysiss_ImprovementAdviceId",
-                table: "ApsAnalysiss",
+                name: "IX_ApsAnalyses_ImprovementAdviceId",
+                table: "ApsAnalyses",
                 column: "ImprovementAdviceId");
 
             migrationBuilder.CreateIndex(
@@ -746,8 +746,8 @@ namespace Pathly_Data.Migrations
                 filter: "[NormalizedUserName] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CareerMaths_AiResponseId",
-                table: "CareerMaths",
+                name: "IX_CareerMatches_AiResponseId",
+                table: "CareerMatches",
                 column: "AiResponseId");
 
             migrationBuilder.CreateIndex(
@@ -872,7 +872,7 @@ namespace Pathly_Data.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
-                name: "CareerMaths");
+                name: "CareerMatches");
 
             migrationBuilder.DropTable(
                 name: "CareerProfiles");
@@ -905,7 +905,7 @@ namespace Pathly_Data.Migrations
                 name: "Subjects");
 
             migrationBuilder.DropTable(
-                name: "UniveristyQualifications");
+                name: "UniversityQualifications");
 
             migrationBuilder.DropTable(
                 name: "UsageTransactions");
@@ -935,7 +935,7 @@ namespace Pathly_Data.Migrations
                 name: "AspNetUsers");
 
             migrationBuilder.DropTable(
-                name: "ApsAnalysiss");
+                name: "ApsAnalyses");
 
             migrationBuilder.DropTable(
                 name: "ImprovementAdvices");

@@ -1,26 +1,11 @@
-﻿using System.Text;
+using System.Text;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 
 namespace Pathly_Services
 {
-    /// <summary>
-    /// Free, open-source replacement for Azure Document Intelligence's text extraction, for
-    /// born-digital PDFs (i.e. PDFs with a real text layer, which covers the vast majority of
-    /// exported transcripts). PdfPig is MIT-licensed and has no per-page cost.
-    ///
-    /// Unlike a naive <c>page.Text</c> read (which is what originally produced unwhitespaced
-    /// blobs and broke regex-based parsing), this walks individual words with their bounding
-    /// boxes and reconstructs lines by vertical position, then orders words left-to-right within
-    /// each line. That keeps table-like layouts (Subject | Mark | Grade columns) readable as
-    /// space-separated text, which is what the downstream Groq structuring step needs.
-    /// </summary>
     internal static class PdfTextExtractor
     {
-        // Fallback tolerance for degenerate cases (zero-height glyphs). Normally we use a
-        // per-word tolerance derived from that word's own height instead — see GroupIntoLines —
-        // so this scales correctly across small print (fine notes) and large headings, rather
-        // than assuming one fixed font size for the whole document.
         private const double FallbackLineTolerance = 3.0;
 
         public static string ExtractText(byte[] fileBytes)

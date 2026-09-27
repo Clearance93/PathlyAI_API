@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Pathly_DTOs;
 using Pathly_Helper;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 
 namespace Pathly_Services
 {

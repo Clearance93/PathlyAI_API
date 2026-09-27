@@ -1,4 +1,4 @@
-﻿namespace Pathly_DTOs
+namespace Pathly_DTOs
 {
     public class ResponseUserDto
     {
@@ -8,7 +8,7 @@
 
         public string? Email { get; set; }
 
-        /// <summary>ApplicationUser.Id of the logged-in user — the UI stores this and sends it
+        /// <summary>ApplicationUser.Id of the logged-in user � the UI stores this and sends it
         /// back when persisting psychometric assessments against the account.</summary>
         public string? UserId { get; set; }
 

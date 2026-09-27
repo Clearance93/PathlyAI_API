@@ -1,9 +1,6 @@
-﻿using AutoMapper;
-using Pathly_Core.Unit;
 using Pathly_DTOs;
 using Pathly_Helper;
-using Pathly_Models;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 
 namespace Pathly_Services
 {
@@ -12,8 +9,10 @@ namespace Pathly_Services
     /// document AI. Replaces the previous Azure Document Intelligence (prebuilt-layout) pipeline
     /// with a fully free stack:
     ///
-    ///   1. Raw text extraction — PdfPig for born-digital PDFs, Tesseract OCR for photos/scans.
-    ///   2. Intelligent structuring — Groq (already used elsewhere in Pathly, generous free tier)
+    ///   1. Raw text extraction � PdfPig for born-digital PDFs, Tesseract OCR for photos/scans.
+    ///   2. Quality gate � the OCR output is checked for the fingerprints of a failed table read
+    ///      (broken subject names, marks detached from rows) before it is trusted.
+    ///   3. Intelligent structuring � Groq (already used elsewhere in Pathly, generous free tier)
     ///      reasons over the raw text to produce subjects/marks/student/institution fields. This
     ///      is what gives us "intelligence" close to Azure's layout AI, and it's actually more
     ///      tolerant of messy OCR output than the old regex/table-cell heuristics were.
@@ -23,24 +22,26 @@ namespace Pathly_Services
         private const int MinimumUsableTextLength = 40;
 
         private readonly IDocumentStructuringService _structuringService;
-        private readonly IUnitOfWork _unit;
-        private readonly IMapper _mapper;
 
-        public DocumentExtractionService(
-            IDocumentStructuringService structuringService,
-            IUnitOfWork unit,
-            IMapper mapper)
+        public DocumentExtractionService(IDocumentStructuringService structuringService)
         {
             _structuringService = structuringService ?? throw new ArgumentNullException(nameof(structuringService));
-            _unit = unit ?? throw new ArgumentNullException(nameof(unit));
-            _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
 
         public async Task<ExtractedAcademicRecordDto> ExtractAcademicRecordAsync(string base64File, string mimeType, string? fileName)
         {
             var fileBytes = Convert.FromBase64String(base64File);
 
-            var rawText = ExtractRawText(fileBytes, mimeType, fileName);
+            var (rawText, ocrQuality) = ExtractRawText(fileBytes, mimeType, fileName);
+
+            if (ocrQuality is not null && !ocrQuality.IsUsable)
+            {
+                // The OCR itself failed (blank, hopelessly blurry, or the table did not survive).
+                // Fail fast with a clear, user-fixable message rather than silently sending
+                // garbage to Groq and returning 3 corrupted subjects.
+                throw new DocumentTextExtractionException(
+                    ocrQuality.Reason ?? "The scan could not be read. Please retry with a clearer photo.");
+            }
 
             if (string.IsNullOrWhiteSpace(rawText) || rawText.Trim().Length < MinimumUsableTextLength)
             {
@@ -53,6 +54,34 @@ namespace Pathly_Services
             var (textToSend, wasTruncated) = EnforceMaxInputSize(compactedText);
 
             var record = await _structuringService.StructureAcademicRecordAsync(textToSend);
+
+            // Deterministic clean-up before anything is scored: assign canonical subject names,
+            // drop rows that are not real subjects (e.g. a stray verb like "napping" or a
+            // "Total" header), and merge duplicate rows within a term. Each change is surfaced
+            // as a warning so the learner can double-check the extraction.
+            var sanitizerWarnings = AcademicRecordSanitizer.Sanitize(record);
+
+            if (sanitizerWarnings.Count > 0)
+            {
+                record.NeedsManualReview = true;
+                record.ExtractionWarnings.AddRange(sanitizerWarnings);
+            }
+
+            // The driver projection (record.Subjects) is what drives the analysis. If the model
+            // returned only term blocks, derive it from the highest-priority block so the empty
+            // check below is meaningful and the analysis has subjects to work with.
+            if (record.Subjects.Count == 0 && record.AcademicPeriods.Count > 0)
+            {
+                var driver = record.AcademicPeriods
+                    .OrderByDescending(p => p.IsFinal)
+                    .ThenByDescending(p => p.Ordinal)
+                    .First();
+
+                record.Subjects = driver.Subjects;
+                record.DriverTermOrdinal = driver.Ordinal == 0 ? null : driver.Ordinal;
+                record.DriverTermLabel = driver.Label;
+                record.DriverIsFinal = driver.IsFinal;
+            }
 
             // The structuring service hands back an empty record when every validation/retry
             // attempt fails, so treat "no subjects extracted" as a controlled, user-fixable
@@ -69,26 +98,42 @@ namespace Pathly_Services
             record.RawExtractedText = rawText;
             record.ExtractedAt = DateTime.Now;
 
+            // The full record (with its period history) is persisted downstream by the analysis
+            // service � PersistSubjectsAsync here previously wrote ORPHANED standalone subject
+            // rows with no record FK (the same subjects were then written a second time, linked,
+            // by CareerAnalysisService). That duplicate write is gone; no standalone write occurs
+            // at extraction time.
+
+            // A readable-but-lossy OCR pass (e.g. some subject names truncated, marks partially
+            // detached) is not a hard failure � Groq may still recover most of it � but it must
+            // be flagged so the UI tells the user to double-check the extracted subjects.
+            if (ocrQuality?.IsLowQuality == true)
+            {
+                record.NeedsManualReview = true;
+                record.ExtractionWarnings.Add(
+                    "This scan was low quality � some subject names or marks may not have been " +
+                    "read perfectly. Please double-check the extracted results against the original " +
+                    "report. Re-photographing it flat and in good light will improve accuracy.");
+            }
+
             if (wasTruncated)
             {
                 // Groq's free tier caps prompt + completion tokens together per minute, so a very
                 // long document (e.g. a multi-year university transcript) can't always be sent in
                 // full. Rather than silently dropping the tail of the document, flag it explicitly
-                // so the person — or a future chunked-extraction pass — knows to double-check.
+                // so the person � or a future chunked-extraction pass � knows to double-check.
                 record.NeedsManualReview = true;
                 record.ExtractionWarnings.Add(
                     "The document was long enough that part of it had to be trimmed before " +
-                    "extraction to stay within the free tier's per-request size limit — please " +
+                    "extraction to stay within the free tier's per-request size limit � please " +
                     "double-check that every subject came through.");
             }
-
-            await PersistSubjectsAsync(record.Subjects);
 
             return record;
         }
 
         // Roughly 4 characters per token for English text. Leaves headroom for the extraction
-        // system prompt (~2,200 characters) plus a minimum completion budget — see
+        // system prompt (~2,200 characters) plus a minimum completion budget � see
         // GroqService.EstimateExtractionMaxTokens, which this number is deliberately kept
         // consistent with.
         private const int MaxInputCharsForExtraction = 20000;
@@ -106,7 +151,7 @@ namespace Pathly_Services
         /// <summary>
         /// Strips blank-line padding left over from per-page extraction (PdfTextExtractor writes
         /// a blank line between every page) before the text goes to Groq. This is pure token-count
-        /// hygiene — Groq's free tier caps prompt + completion tokens per minute combined, so
+        /// hygiene � Groq's free tier caps prompt + completion tokens per minute combined, so
         /// cutting dead whitespace directly widens how large a document can be processed without
         /// hitting that limit. Nothing semantically meaningful is removed; the full original text
         /// is still preserved on <see cref="ExtractedAcademicRecordDto.RawExtractedText"/>.
@@ -137,26 +182,35 @@ namespace Pathly_Services
             return string.Join("\n", compacted).Trim();
         }
 
-        private static string ExtractRawText(byte[] fileBytes, string mimeType, string? fileName)
+        private static (string Text, OcrQualityResult? Quality) ExtractRawText(byte[] fileBytes, string mimeType, string? fileName)
         {
             var isPdf = (mimeType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false) ||
                         (fileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ?? false);
 
-            return isPdf
-                ? PdfTextExtractor.ExtractText(fileBytes)
-                : ImageOcrExtractor.ExtractText(fileBytes);
-        }
-
-        private async Task PersistSubjectsAsync(List<ExtractedSubjectDto> subjects)
-        {
-            foreach (var subjectDto in subjects)
+            if (isPdf)
             {
-                var subjectModel = _mapper.Map<ExtractedSubject>(subjectDto);
-
-                await _unit.ExtractedSubject.AddAsync(subjectModel);
+                // Born-digital PDFs have a real text layer (no OCR, no quality gate needed).
+                return (PdfTextExtractor.ExtractText(fileBytes), null);
             }
 
-            await _unit.SaveChangesAsync();
+            // Photo/scan ? Tesseract OCR. Evaluate the raw output before trusting it.
+            var ocr = ImageOcrExtractor.ExtractText(fileBytes);
+
+            if (ocr.Blurry)
+            {
+                // The pre-OCR sharpness gate rejected the image. Fail fast with clear guidance.
+                return (string.Empty, new OcrQualityResult
+                {
+                    IsUsable = false,
+                    Reason = "The photo is too blurry to read the results reliably. Please " +
+                             "re-photograph the report FLAT and TOP-DOWN (not at an angle), in good, " +
+                             "even lighting, with the whole table sharp and in frame, then retry."
+                });
+            }
+
+            var quality = OcrQualityEvaluator.Evaluate(ocr.Text, ocr.MeanConfidence);
+
+            return (ocr.Text, quality);
         }
     }
 }

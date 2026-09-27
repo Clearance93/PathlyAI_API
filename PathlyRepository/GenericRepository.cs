@@ -1,6 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Pathly_Data;
-using PathlyInterfaces;
+using Pathly_Interfaces;
 using System.Linq.Expressions;
 
 namespace PathlyRepository
@@ -45,6 +45,11 @@ namespace PathlyRepository
         public void Update(T entity)
         {
             _Context.Update(entity);
+        }
+
+        public void Remove(T entity)
+        {
+            _DbSet.Remove(entity);
         }
     }
 }

@@ -1,9 +1,9 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pathly_Core;
 using Pathly_DTOs;
 using Pathly_Helper;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 using System.Text;
 using System.Text.Json;
 

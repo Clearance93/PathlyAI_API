@@ -1,12 +1,12 @@
-ï»¿using Pathly_DTOs;
-using PathlyInterfaces.IService;
+using Pathly_DTOs;
+using Pathly_Interfaces.IService;
 
 namespace Pathly_Tests
 {
     /// <summary>
     /// Minimal hand-rolled test double for <see cref="IDocumentStructuringService"/>, so
     /// <see cref="Pathly_Services.SelfValidatingDocumentStructuringService"/> can be tested
-    /// without a real Groq call â€” matches the style of <see cref="FakeAiProvider"/>.
+    /// without a real Groq call — matches the style of <see cref="FakeAiProvider"/>.
     /// </summary>
     public class FakeDocumentStructuringService : IDocumentStructuringService
     {
@@ -14,7 +14,7 @@ namespace Pathly_Tests
 
         /// <summary>
         /// One factory per call, consumed in order. If calls exceed the queued factories, the
-        /// last one is reused â€” convenient for "always returns the same thing" tests.
+        /// last one is reused — convenient for "always returns the same thing" tests.
         /// </summary>
         public List<Func<ExtractedAcademicRecordDto>> ResponsesInOrder { get; } = new();
 

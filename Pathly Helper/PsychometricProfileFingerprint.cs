@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using Pathly_DTOs;
 
@@ -6,7 +6,7 @@ namespace Pathly_Helper
 {
     /// <summary>
     /// Exact fingerprint for a psychometric profile (Part 13). Deliberately no rounding or
-    /// banding — two profiles differing by even a single point across any dimension must
+    /// banding � two profiles differing by even a single point across any dimension must
     /// never be treated as the same premium analysis input.
     /// </summary>
     public static class PsychometricProfileFingerprint

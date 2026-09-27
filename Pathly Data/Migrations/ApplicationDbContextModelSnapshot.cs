@@ -155,6 +155,31 @@ namespace Pathly_Data.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Pathly_Models.AcademicPeriod", b =>
+                {
+                    b.Property<Guid>("AcademicPeriodId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExtractedAcademicRecordId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsFinal")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("int");
+
+                    b.HasKey("AcademicPeriodId");
+
+                    b.HasIndex("ExtractedAcademicRecordId", "Ordinal");
+
+                    b.ToTable("AcademicPeriods");
+                });
+
             modelBuilder.Entity("Pathly_Models.AcademicRecords", b =>
                 {
                     b.Property<Guid>("AcadmicRecordId")
@@ -178,7 +203,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasKey("AcadmicRecordId");
 
-                    b.ToTable("AcademicRecords", (string)null);
+                    b.ToTable("AcademicRecords");
                 });
 
             modelBuilder.Entity("Pathly_Models.AiResponse", b =>
@@ -196,11 +221,20 @@ namespace Pathly_Data.Migrations
                     b.Property<string>("AnalysisVersion")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ApplicationUserId")
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<Guid>("ApsAnalysisId")
                         .HasColumnType("uniqueidentifier");
 
                     b.PrimitiveCollection<string>("BursariesAvailable")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DriverTermLabel")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("ExtractionAcademicRecordId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("FeedBack")
                         .HasColumnType("nvarchar(max)");
@@ -278,7 +312,9 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("ApsAnalysisId");
 
-                    b.ToTable("AiResponse", (string)null);
+                    b.HasIndex("ApplicationUserId", "AddedAt");
+
+                    b.ToTable("AiResponse");
                 });
 
             modelBuilder.Entity("Pathly_Models.ApplicationUser", b =>
@@ -318,6 +354,9 @@ namespace Pathly_Data.Migrations
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<bool>("MarketingConsent")
+                        .HasColumnType("bit");
+
                     b.Property<string>("MicrosoftId")
                         .HasColumnType("nvarchar(max)");
 
@@ -329,9 +368,6 @@ namespace Pathly_Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
-                    b.Property<string>("Password")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
 
@@ -341,13 +377,19 @@ namespace Pathly_Data.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
-                    b.Property<string>("ProofilePictures")
+                    b.Property<string>("ProfilePictures")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Subscription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("TermsAcceptedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TermsVersion")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("TwoFactorEnabled")
@@ -407,7 +449,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("ImprovementAdviceId");
 
-                    b.ToTable("ApsAnalysiss", (string)null);
+                    b.ToTable("ApsAnalyses");
                 });
 
             modelBuilder.Entity("Pathly_Models.CareerMatch", b =>
@@ -459,7 +501,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("AiResponseId");
 
-                    b.ToTable("CareerMaths", (string)null);
+                    b.ToTable("CareerMatches");
                 });
 
             modelBuilder.Entity("Pathly_Models.CareerProfile", b =>
@@ -514,7 +556,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasKey("CareerProfileId");
 
-                    b.ToTable("CareerProfiles", (string)null);
+                    b.ToTable("CareerProfiles");
                 });
 
             modelBuilder.Entity("Pathly_Models.CreditTransaction", b =>
@@ -548,7 +590,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("CreditTransactions", (string)null);
+                    b.ToTable("CreditTransactions");
                 });
 
             modelBuilder.Entity("Pathly_Models.DemandingCareerAssessment", b =>
@@ -603,7 +645,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("AiResponseId");
 
-                    b.ToTable("DemandingCareerAssessments", (string)null);
+                    b.ToTable("DemandingCareerAssessments");
                 });
 
             modelBuilder.Entity("Pathly_Models.DyingCareerWarning", b =>
@@ -649,7 +691,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("AiResponseId");
 
-                    b.ToTable("DyingCareerWarning", (string)null);
+                    b.ToTable("DyingCareerWarning");
                 });
 
             modelBuilder.Entity("Pathly_Models.EmploymentOutlook", b =>
@@ -698,7 +740,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("AiResponseId");
 
-                    b.ToTable("EmploymentOutlooks", (string)null);
+                    b.ToTable("EmploymentOutlooks");
                 });
 
             modelBuilder.Entity("Pathly_Models.ExtractedAcademicRecord", b =>
@@ -707,6 +749,24 @@ namespace Pathly_Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int?>("AcademicYear")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AdmissionNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ApplicationUserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("DriverIsFinal")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("DriverTermLabel")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("DriverTermOrdinal")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("ExtractedAt")
                         .HasColumnType("datetime2");
 
@@ -714,6 +774,9 @@ namespace Pathly_Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("InstitutionType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LearnerNo")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RawExtractedText")
@@ -727,7 +790,9 @@ namespace Pathly_Data.Migrations
 
                     b.HasKey("ExtractionAcademicRecordId");
 
-                    b.ToTable("ExtractedAcademicRecords", (string)null);
+                    b.HasIndex("ApplicationUserId");
+
+                    b.ToTable("ExtractedAcademicRecords");
                 });
 
             modelBuilder.Entity("Pathly_Models.ExtractedSubject", b =>
@@ -736,8 +801,17 @@ namespace Pathly_Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("AcademicPeriodId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CanonicalSubjectName")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid?>("ExtractedAcademicRecordExtractionAcademicRecordId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsFinal")
+                        .HasColumnType("bit");
 
                     b.Property<string>("MarkType")
                         .HasColumnType("nvarchar(max)");
@@ -754,11 +828,19 @@ namespace Pathly_Data.Migrations
                     b.Property<string>("Symbol")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("TermLabel")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("TermOrdinal")
+                        .HasColumnType("int");
+
                     b.HasKey("ExtractionSubjectId");
+
+                    b.HasIndex("AcademicPeriodId");
 
                     b.HasIndex("ExtractedAcademicRecordExtractionAcademicRecordId");
 
-                    b.ToTable("ExtractedSubjects", (string)null);
+                    b.ToTable("ExtractedSubjects");
                 });
 
             modelBuilder.Entity("Pathly_Models.ImprovementAdvice", b =>
@@ -787,7 +869,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasKey("ImprovementAdviceId");
 
-                    b.ToTable("ImprovementAdvices", (string)null);
+                    b.ToTable("ImprovementAdvices");
                 });
 
             modelBuilder.Entity("Pathly_Models.PaymentTransaction", b =>
@@ -848,7 +930,7 @@ namespace Pathly_Data.Migrations
                     b.HasIndex("Reference")
                         .IsUnique();
 
-                    b.ToTable("PaymentTransactions", (string)null);
+                    b.ToTable("PaymentTransactions");
                 });
 
             modelBuilder.Entity("Pathly_Models.Plan", b =>
@@ -907,7 +989,7 @@ namespace Pathly_Data.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("Plans", (string)null);
+                    b.ToTable("Plans");
                 });
 
             modelBuilder.Entity("Pathly_Models.PsychometricAssessment", b =>
@@ -951,7 +1033,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("PsychometricProfileId");
 
-                    b.ToTable("PsychometricAssessments", (string)null);
+                    b.ToTable("PsychometricAssessments");
                 });
 
             modelBuilder.Entity("Pathly_Models.PsychometricProfile", b =>
@@ -988,7 +1070,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("ApplicationUserId");
 
-                    b.ToTable("PsychometricProfiles", (string)null);
+                    b.ToTable("PsychometricProfiles");
                 });
 
             modelBuilder.Entity("Pathly_Models.Subject", b =>
@@ -1012,7 +1094,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasKey("SubjectId");
 
-                    b.ToTable("Subjects", (string)null);
+                    b.ToTable("Subjects");
                 });
 
             modelBuilder.Entity("Pathly_Models.SubjectResults", b =>
@@ -1051,12 +1133,12 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("AiResponseId");
 
-                    b.ToTable("SubjectResults", (string)null);
+                    b.ToTable("SubjectResults");
                 });
 
-            modelBuilder.Entity("Pathly_Models.UniveristyQualification", b =>
+            modelBuilder.Entity("Pathly_Models.UniversityQualification", b =>
                 {
-                    b.Property<Guid>("UnviversityQualificationId")
+                    b.Property<Guid>("UniversityQualificationId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
@@ -1078,9 +1160,9 @@ namespace Pathly_Data.Migrations
                     b.Property<string>("Status")
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("UnviversityQualificationId");
+                    b.HasKey("UniversityQualificationId");
 
-                    b.ToTable("UniveristyQualifications", (string)null);
+                    b.ToTable("UniversityQualifications");
                 });
 
             modelBuilder.Entity("Pathly_Models.UsageTransaction", b =>
@@ -1114,7 +1196,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("UserId", "CreatedAtUtc");
 
-                    b.ToTable("UsageTransactions", (string)null);
+                    b.ToTable("UsageTransactions");
                 });
 
             modelBuilder.Entity("Pathly_Models.UserSubscription", b =>
@@ -1156,7 +1238,7 @@ namespace Pathly_Data.Migrations
 
                     b.HasIndex("UserId", "Status");
 
-                    b.ToTable("UserSubscriptions", (string)null);
+                    b.ToTable("UserSubscriptions");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1210,8 +1292,24 @@ namespace Pathly_Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Pathly_Models.AcademicPeriod", b =>
+                {
+                    b.HasOne("Pathly_Models.ExtractedAcademicRecord", "ExtractedAcademicRecord")
+                        .WithMany("AcademicPeriods")
+                        .HasForeignKey("ExtractedAcademicRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ExtractedAcademicRecord");
+                });
+
             modelBuilder.Entity("Pathly_Models.AiResponse", b =>
                 {
+                    b.HasOne("Pathly_Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicationUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Pathly_Models.ApsAnalysis", "ApsAnalysis")
                         .WithMany()
                         .HasForeignKey("ApsAnalysisId")
@@ -1267,11 +1365,26 @@ namespace Pathly_Data.Migrations
                         .HasForeignKey("AiResponseId");
                 });
 
+            modelBuilder.Entity("Pathly_Models.ExtractedAcademicRecord", b =>
+                {
+                    b.HasOne("Pathly_Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicationUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("Pathly_Models.ExtractedSubject", b =>
                 {
+                    b.HasOne("Pathly_Models.AcademicPeriod", "AcademicPeriod")
+                        .WithMany("Subjects")
+                        .HasForeignKey("AcademicPeriodId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Pathly_Models.ExtractedAcademicRecord", null)
                         .WithMany("Subjects")
                         .HasForeignKey("ExtractedAcademicRecordExtractionAcademicRecordId");
+
+                    b.Navigation("AcademicPeriod");
                 });
 
             modelBuilder.Entity("Pathly_Models.PaymentTransaction", b =>
@@ -1359,6 +1472,11 @@ namespace Pathly_Data.Migrations
                     b.Navigation("Plan");
                 });
 
+            modelBuilder.Entity("Pathly_Models.AcademicPeriod", b =>
+                {
+                    b.Navigation("Subjects");
+                });
+
             modelBuilder.Entity("Pathly_Models.AcademicRecords", b =>
                 {
                     b.Navigation("SubjectResults");
@@ -1379,6 +1497,8 @@ namespace Pathly_Data.Migrations
 
             modelBuilder.Entity("Pathly_Models.ExtractedAcademicRecord", b =>
                 {
+                    b.Navigation("AcademicPeriods");
+
                     b.Navigation("Subjects");
                 });
 #pragma warning restore 612, 618

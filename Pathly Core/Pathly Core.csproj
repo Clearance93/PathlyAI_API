@@ -15,7 +15,7 @@
     <ProjectReference Include="..\Pathly Data\Pathly Data.csproj" />
     <ProjectReference Include="..\Pathly DTOs\Pathly DTOs.csproj" />
     <ProjectReference Include="..\Pathly Models\Pathly Models.csproj" />
-    <ProjectReference Include="..\PathlyInterfaces\PathlyInterfaces.csproj" />
+    <ProjectReference Include="..\Pathly_Interfaces\Pathly_Interfaces.csproj" />
   </ItemGroup>
 
 </Project>

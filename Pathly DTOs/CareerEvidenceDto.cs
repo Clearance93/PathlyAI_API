@@ -1,4 +1,4 @@
-﻿namespace Pathly_DTOs
+namespace Pathly_DTOs
 {
     /// <summary>
     /// The deterministic evidence computed for one career against one learner's profile

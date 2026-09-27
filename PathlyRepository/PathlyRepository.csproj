@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Pathly Data\Pathly Data.csproj" />
-    <ProjectReference Include="..\PathlyInterfaces\PathlyInterfaces.csproj" />
+    <ProjectReference Include="..\Pathly_Interfaces\Pathly_Interfaces.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-﻿using Pathly_Services;
+using Pathly_Services;
 using Xunit;
 
 namespace Pathly_Tests
@@ -91,7 +91,7 @@ namespace Pathly_Tests
         {
             // Reproduces the real-world failure this was built to fix: Groq throwing
             // HttpRequestException (e.g. a 413 token-limit error) shouldn't crash the whole
-            // upload — it should be treated like a failed attempt and retried.
+            // upload � it should be treated like a failed attempt and retried.
             var inner = new FakeDocumentStructuringService();
             inner.ResponsesInOrder.Add(() => throw new HttpRequestException("RequestEntityTooLarge"));
             inner.ResponsesInOrder.Add(FakeDocumentStructuringService.ValidRecord);

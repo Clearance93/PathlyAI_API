@@ -2,6 +2,30 @@ using Pathly_DTOs;
 
 public class AiResponseDto
 {
+    /// <summary>Id of the persisted analysis row, so the UI can re-open this exact report later.</summary>
+    public Guid AiResponseId { get; set; }
+
+    /// <summary>The extracted academic record this analysis came from (used for premium combination).</summary>
+    public Guid? ExtractionAcademicRecordId { get; set; }
+
+    /// <summary>Label of the term/final block used as the driver for this analysis.</summary>
+    public string? DriverTermLabel { get; set; }
+
+    /// <summary>True for Layer 2 (academic + psychometric) analyses, false for academic-only.</summary>
+    public bool IsPremium { get; set; }
+
+    /// <summary>When this report was generated (UTC).</summary>
+    public DateTime? GeneratedAt { get; set; }
+
+    /// <summary>Deterministic next-term projection, shown to the learner alongside the report.</summary>
+    public AcademicPredictionDto? AcademicPrediction { get; set; }
+
+    /// <summary>True when the free extraction pipeline flagged the underlying record for manual review.</summary>
+    public bool NeedsManualReview { get; set; }
+
+    /// <summary>Human-readable extraction warnings worth surfacing to the learner.</summary>
+    public List<string>? ExtractionWarnings { get; set; }
+
     public double OverallScore { get; set; }
 
     public string? AcademicPersonality { get; set; }

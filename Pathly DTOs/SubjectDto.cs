@@ -1,7 +1,7 @@
-﻿namespace Pathly_DTOs
+namespace Pathly_DTOs
 {
     /// <summary>
-    /// A canonical, reusable subject record (the "subject knowledge layer" — Part 2/15).
+    /// A canonical, reusable subject record (the "subject knowledge layer" � Part 2/15).
     /// Not to be confused with a learner's actual result for a subject, which lives on
     /// <see cref="ExtractedSubjectDto"/>/<see cref="SubjectResultsDto"/>.
     /// </summary>

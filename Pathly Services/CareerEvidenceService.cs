@@ -1,9 +1,9 @@
-ï»¿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using Pathly_Core.Unit;
 using Pathly_DTOs;
 using Pathly_Helper;
 using Pathly_Models;
-using PathlyInterfaces.IService;
+using Pathly_Interfaces.IService;
 
 namespace Pathly_Services
 {
@@ -37,7 +37,7 @@ namespace Pathly_Services
 
             if (careers.Count == 0)
             {
-                // No seeded career knowledge base yet â€” nothing to compute evidence against.
+                // No seeded career knowledge base yet — nothing to compute evidence against.
                 // Callers should treat an empty list as "let the AI use its own general
                 // knowledge", not as an error.
                 return new List<CareerEvidenceDto>();
@@ -91,7 +91,7 @@ namespace Pathly_Services
         {
             if (minimumAps <= 0)
             {
-                return 50; // No academic bar defined for this career â€” treat as neutral.
+                return 50; // No academic bar defined for this career — treat as neutral.
             }
 
             if (totalAps >= minimumAps)
@@ -116,7 +116,7 @@ namespace Pathly_Services
 
             if (requiredSubjects.Count == 0)
             {
-                return 50; // No specific subject requirements defined â€” neutral score.
+                return 50; // No specific subject requirements defined — neutral score.
             }
 
             var scores = requiredSubjects.Select(required =>
@@ -135,7 +135,7 @@ namespace Pathly_Services
 
             if (weightSum <= 0)
             {
-                return 50; // Career has no defined RIASEC profile â€” neutral score.
+                return 50; // Career has no defined RIASEC profile — neutral score.
             }
 
             var weightedScore =

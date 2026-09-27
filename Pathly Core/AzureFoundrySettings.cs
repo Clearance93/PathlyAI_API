@@ -1,4 +1,4 @@
-﻿namespace Pathly_Core
+namespace Pathly_Core
 {
     /// <summary>
     /// Configuration for Azure AI Foundry's Model Router.
@@ -10,7 +10,7 @@
         /// The Azure OpenAI-compatible v1 endpoint for your Foundry resource,
         /// e.g. "https://eduhub-foundry.openai.azure.com/openai/v1"
         /// (found on the Foundry dashboard under "Azure OpenAI endpoint").
-        /// Do NOT include a trailing slash or "/chat/completions" — the service adds that.
+        /// Do NOT include a trailing slash or "/chat/completions" � the service adds that.
         /// </summary>
         public string Endpoint { get; set; } = string.Empty;
 

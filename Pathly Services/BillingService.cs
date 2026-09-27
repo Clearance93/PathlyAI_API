@@ -3,8 +3,8 @@ using Pathly_Core.Unit;
 using Pathly_DTOs;
 using Pathly_Enums;
 using Pathly_Models;
-using PathlyInterfaces.IService;
-using PathlyInterfaces;
+using Pathly_Interfaces.IService;
+using Pathly_Interfaces;
 using System.Security.Cryptography;
 
 namespace Pathly_Services

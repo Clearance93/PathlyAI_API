@@ -1,4 +1,4 @@
-﻿namespace Pathly_DTOs
+namespace Pathly_DTOs
 {
     /// <summary>
     /// A learner's psychometric profile using RIASEC (Holland Code) interest dimensions,

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Pathly_Data;
 using Pathly_Models;
-using PathlyInterfaces;
+using Pathly_Interfaces;
 
 namespace PathlyRepository
 {
