@@ -19,5 +19,14 @@ namespace Pathly_Interfaces.IService
 
         /// <summary>Re-sends the confirmation email if the address exists and is not yet confirmed.</summary>
         Task ResendConfirmationAsync(ForgotPasswordDto dto);
+
+        /// <summary>
+        /// Exchanges a valid refresh token for a new access token, rotating (and revoking) the old
+        /// refresh token. Throws when the token is unknown, expired, revoked or already reused.
+        /// </summary>
+        Task<ResponseUserDto> RefreshAsync(string refreshToken);
+
+        /// <summary>Revokes a refresh token (sign-out). Silently no-ops for an unknown token.</summary>
+        Task RevokeRefreshTokenAsync(string refreshToken);
     }
 }

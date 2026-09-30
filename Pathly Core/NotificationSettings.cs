@@ -37,5 +37,17 @@ namespace Pathly_Core
     {
         /// <summary>When true, a learner must confirm their email address before they can sign in.</summary>
         public bool RequireConfirmedEmail { get; set; }
+
+        /// <summary>Lifetime of an issued access (JWT) token, in minutes. Short by design so a
+        /// stolen token is useful for a limited window; the refresh token renews sessions.</summary>
+        public int AccessTokenMinutes { get; set; } = 60;
+
+        /// <summary>Lifetime of a refresh token, in days. Rotated on every use.</summary>
+        public int RefreshTokenDays { get; set; } = 30;
+
+        /// <summary>When true, refresh tokens are also written as an httpOnly cookie (the browser
+        /// never exposes them to JavaScript). The raw token is still returned in the body so the
+        /// SPA works even where cross-site cookies are blocked.</summary>
+        public bool UseRefreshTokenCookie { get; set; } = true;
     }
 }

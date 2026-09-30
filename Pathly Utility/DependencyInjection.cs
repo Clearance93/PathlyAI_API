@@ -25,6 +25,7 @@ namespace Pathly_Utility
             // gives each service a managed HttpClient instance.
             services.AddHttpClient<GroqService>();
             services.AddHttpClient<AzureModelRouterService>();
+            services.AddHttpClient<TurnstileVerificationService>();
 
             services.AddSingleton(provider =>
             {
@@ -51,6 +52,7 @@ namespace Pathly_Utility
             services.Configure<SmtpSettings>(configuratio.GetSection("Smtp"));
             services.Configure<AppSettings>(configuratio.GetSection("App"));
             services.Configure<AuthSettings>(configuratio.GetSection("Auth"));
+            services.Configure<TurnstileSettings>(configuratio.GetSection("Turnstile"));
 
             // Outbound email (password reset / email confirmation). Falls back to logging when
             // SMTP is not configured, so auth flows still work in local/dev environments.
@@ -62,7 +64,6 @@ namespace Pathly_Utility
 
             //Repository
             services.AddScoped<IAuthenticationRepository, AuthenticationRepository>();
-            services.AddScoped<IAcademicRecordRepositoryInterface, AcademicRecordRepository>();
             services.AddScoped<IaiResponseRepositoryInterface, AiResponseRepository>();
             services.AddScoped<ISubjectResultsRepositoryInterface, SubjectResultsRepository>(); 
             services.AddScoped<ICareerMatchRepositoryInterface, CareerMatchRepository>();
@@ -81,6 +82,7 @@ namespace Pathly_Utility
             services.AddScoped<IPaymentTransactionRepositoryInterface, PaymentTransactionRepository>();
             services.AddScoped<IUsageTransactionRepositoryInterface, UsageTransactionRepository>();
             services.AddScoped<ICreditTransactionRepositoryInterface, CreditTransactionRepository>();
+            services.AddScoped<IRefreshTokenRepositoryInterface, RefreshTokenRepository>();
 
             //Services
             services.AddScoped<IAuthServiceInterface, AuthenticationService>();
@@ -95,6 +97,8 @@ namespace Pathly_Utility
             services.AddScoped<IPsychometricService, PsychometricService>();
             services.AddScoped<IAnalysisQueryService, AnalysisQueryService>();
             services.AddScoped<IAccountService, AccountService>();
+            services.AddScoped<IProgressionService, ProgressionService>();
+            services.AddScoped<ICaptchaVerificationService>(sp => sp.GetRequiredService<TurnstileVerificationService>());
 
             // Groq-only for now (Azure AI Foundry temporarily disabled � everything Azure-related
             // is left in place below, untouched, so this is a one-line flip back to

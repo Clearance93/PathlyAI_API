@@ -7,8 +7,6 @@ namespace Pathly_Core.Unit
     {
         private readonly ApplicationDbContext _Context;
 
-        public IAcademicRecordRepositoryInterface AcademicRecord { get ; private set ; }
-
         public IAuthenticationRepository User { get; private set; }
 
         public IaiResponseRepositoryInterface AiResponse { get; private set; }
@@ -50,7 +48,6 @@ namespace Pathly_Core.Unit
         public ICreditTransactionRepositoryInterface CreditTransaction { get; private set; }
 
         public UnitOfWork(ApplicationDbContext context,
-                          IAcademicRecordRepositoryInterface academicRecord,
                           IAuthenticationRepository user,
                           IaiResponseRepositoryInterface aiResponse,
                           IDyingCareerWarningRepositoyInterface dyingCareer,
@@ -73,7 +70,6 @@ namespace Pathly_Core.Unit
                           ICreditTransactionRepositoryInterface creditTransaction)
         {
             _Context = context;
-            AcademicRecord = academicRecord ?? throw new ArgumentNullException(nameof(academicRecord));
             User = user ?? throw new ArgumentNullException(nameof(user));
             AiResponse = aiResponse ?? throw new ArgumentNullException(nameof(aiResponse));
             DyingCareer = dyingCareer ?? throw new ArgumentNullException(nameof(dyingCareer));

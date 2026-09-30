@@ -1,0 +1,28 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore PathlyAI_API.slnx
+
+      - name: Build
+        run: dotnet build PathlyAI_API.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test "Pathly Tests/Pathly Tests.csproj" --configuration Release --no-build --verbosity normal

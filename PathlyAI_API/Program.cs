@@ -14,7 +14,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("PathlyConnection"));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("PathlyConnection"),
+        // Azure SQL intermittently drops connections — retry transparently instead of surfacing
+        // a 500 to the learner.
+        sql => sql.EnableRetryOnFailure());
 });
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -99,7 +103,11 @@ builder.Services.AddCors(options =>
         }
 
         policy.AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              // Required so the browser sends/receives the httpOnly refresh-token cookie on
+              // cross-origin (frontend → API) auth calls. Safe here because the policy pins an
+              // explicit origin allow-list rather than a wildcard.
+              .AllowCredentials();
     });
 });
 
@@ -175,6 +183,16 @@ app.UseHttpsRedirection();
 
 app.UseCors("AllowedOrigins");
 
+// Never let a browser or intermediary proxy cache an API response. Auth/session data and
+// per-user reports must not be replayable: without this, a shared-device or shared-proxy
+// setup could theoretically serve one account's cached response to another.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+    context.Response.Headers["Pragma"] = "no-cache";
+    await next();
+});
+
 app.UseRateLimiter();
 
 app.UseAuthentication();
@@ -184,3 +202,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+/// <summary>Exposed so integration tests can boot the real application host via
+/// WebApplicationFactory&lt;Program&gt;.</summary>
+public partial class Program { }

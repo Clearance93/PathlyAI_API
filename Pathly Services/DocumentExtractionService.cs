@@ -32,6 +32,8 @@ namespace Pathly_Services
         {
             var fileBytes = Convert.FromBase64String(base64File);
 
+            ValidateContentSignature(fileBytes, mimeType);
+
             var (rawText, ocrQuality) = ExtractRawText(fileBytes, mimeType, fileName);
 
             if (ocrQuality is not null && !ocrQuality.IsUsable)
@@ -130,6 +132,60 @@ namespace Pathly_Services
             }
 
             return record;
+        }
+
+        /// <summary>
+        /// Rejects uploads whose binary contents clearly disagree with the declared MIME type
+        /// (e.g. a PDF renamed to .png, or junk bytes claiming to be a PDF). Conservative: only
+        /// fires when both the declared and the detected type are recognised and differ, so it
+        /// never blocks a legitimate file.
+        /// </summary>
+        private static void ValidateContentSignature(byte[] bytes, string? mimeType)
+        {
+            if (bytes.Length < 4)
+            {
+                throw new DocumentTextExtractionException(
+                    "The uploaded file appears to be empty or unreadable. Please upload your results document again.");
+            }
+
+            var actual = DetectFileKind(bytes);
+            var declared = NormalizeMime(mimeType);
+
+            if (actual != FileKind.Unknown && declared != FileKind.Unknown && actual != declared)
+            {
+                throw new DocumentTextExtractionException(
+                    "The file's contents don't match the file type you uploaded. Please upload the " +
+                    "original PDF, JPG or PNG file without renaming it.");
+            }
+        }
+
+        private enum FileKind { Unknown, Pdf, Jpeg, Png }
+
+        private static FileKind DetectFileKind(byte[] b)
+        {
+            // PDF: "%PDF"
+            if (b[0] == 0x25 && b[1] == 0x50 && b[2] == 0x44 && b[3] == 0x46) return FileKind.Pdf;
+            // JPEG: FF D8 FF
+            if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return FileKind.Jpeg;
+            // PNG: 89 50 4E 47
+            if (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) return FileKind.Png;
+            return FileKind.Unknown;
+        }
+
+        private static FileKind NormalizeMime(string? mimeType)
+        {
+            if (string.IsNullOrWhiteSpace(mimeType))
+            {
+                return FileKind.Unknown;
+            }
+
+            var mime = mimeType.ToLowerInvariant();
+
+            if (mime.Contains("pdf")) return FileKind.Pdf;
+            if (mime.Contains("jpeg") || mime.Contains("jpg")) return FileKind.Jpeg;
+            if (mime.Contains("png")) return FileKind.Png;
+
+            return FileKind.Unknown;
         }
 
         // Roughly 4 characters per token for English text. Leaves headroom for the extraction

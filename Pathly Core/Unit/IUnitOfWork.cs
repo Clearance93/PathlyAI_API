@@ -4,8 +4,6 @@ namespace Pathly_Core.Unit
 {
     public interface IUnitOfWork : IDisposable
     {
-        IAcademicRecordRepositoryInterface AcademicRecord { get; }
-
         IaiResponseRepositoryInterface AiResponse { get; }
 
         ExtractedAcademicRecordInterfaceRepository ExtractedAcademicRecord { get; }

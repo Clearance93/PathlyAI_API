@@ -31,5 +31,8 @@ namespace Pathly_DTOs
 
         /// <summary>Registration-time opt-in to marketing communications (optional, never implied).</summary>
         public bool MarketingConsent { get; set; }
+
+        /// <summary>Cloudflare Turnstile token solved by the client at registration (bot protection).</summary>
+        public string? CaptchaToken { get; set; }
     }
 }

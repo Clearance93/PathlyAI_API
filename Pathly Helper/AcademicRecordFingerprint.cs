@@ -22,7 +22,7 @@ namespace Pathly_Helper
         /// Current analysis reasoning version. Bump this whenever Pathly's recommendation logic
         /// changes materially, so old cached results stop being served automatically.
         /// </summary>
-        public const string CurrentAnalysisVersion = "1.0";
+        public const string CurrentAnalysisVersion = "1.1";
 
         public static string ComputeHash(
             ExtractedAcademicRecordDto record,
@@ -69,8 +69,8 @@ namespace Pathly_Helper
             // Cambridge-style grade-equivalent estimates). Fall back to the raw symbol so
             // ungraded/incomplete rows still contribute to the fingerprint distinctly.
             // MarkType is included so a real 80% and a Cambridge "A" (estimated at 80%)
-            // never collapse into the same cache entry. The exact numeric mark is used —
-            // never rounded or bucketed — so e.g. 74% and 75% always produce different hashes.
+            // never collapse into the same cache entry. The exact numeric mark is used ï¿½
+            // never rounded or bucketed ï¿½ so e.g. 74% and 75% always produce different hashes.
             var value = subject.NumericMark.HasValue
                 ? subject.NumericMark.Value.ToString()
                 : SubjectNormalizer.Normalize(subject.Symbol);

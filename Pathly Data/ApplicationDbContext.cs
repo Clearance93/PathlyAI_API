@@ -52,6 +52,8 @@ namespace Pathly_Data
 
         public DbSet<CreditTransaction> CreditTransactions { get; set; }
 
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -92,6 +94,32 @@ namespace Pathly_Data
 
             modelBuilder.Entity<CreditTransaction>()
                 .HasIndex(c => c.UserId);
+
+            // Refresh tokens are hashed, rotated and bound to the account. Removing the account
+            // revokes them (cascade). Configured VIA the navigation property so EF does not also
+            // create a duplicate shadow FK column for it.
+            modelBuilder.Entity<RefreshToken>()
+                .HasOne(t => t.ApplicationUser)
+                .WithMany()
+                .HasForeignKey(t => t.ApplicationUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // SHA-256 hex is 64 chars — bounded so the unique index is small and portable.
+            modelBuilder.Entity<RefreshToken>()
+                .Property(t => t.TokenHash)
+                .HasMaxLength(64)
+                .IsRequired();
+
+            modelBuilder.Entity<RefreshToken>()
+                .Property(t => t.ReplacedByTokenHash)
+                .HasMaxLength(64);
+
+            modelBuilder.Entity<RefreshToken>()
+                .HasIndex(t => t.TokenHash)
+                .IsUnique();
+
+            modelBuilder.Entity<RefreshToken>()
+                .HasIndex(t => t.ApplicationUserId);
 
             // Extracted records may (optionally) be bound to the uploading account. Deleting an
             // account keeps the academic record row (SetNull) so a learner's analysis history is

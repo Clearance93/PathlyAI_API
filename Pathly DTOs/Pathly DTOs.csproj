@@ -8,10 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Steeltoe.Common" Version="4.2.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Pathly Enums\Pathly Enums.csproj" />
   </ItemGroup>
 

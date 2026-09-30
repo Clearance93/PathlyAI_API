@@ -22,6 +22,9 @@ namespace Pathly_DTOs
 
         public int AnsweredQuestions { get; set; }
 
+        /// <summary>The persisted detailed report (JSON), when one was submitted with the answers.</summary>
+        public string? ReportJson { get; set; }
+
         /// <summary>True when an identical submission already existed and no new row was written.</summary>
         public bool ServedFromExisting { get; set; }
 

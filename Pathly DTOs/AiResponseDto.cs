@@ -20,6 +20,12 @@ public class AiResponseDto
     /// <summary>Deterministic next-term projection, shown to the learner alongside the report.</summary>
     public AcademicPredictionDto? AcademicPrediction { get; set; }
 
+    /// <summary>
+    /// Longitudinal progression across every upload for this account (termly/yearly trends),
+    /// so a new upload builds on the learner's history instead of discarding it.
+    /// </summary>
+    public ProgressionDto? Progression { get; set; }
+
     /// <summary>True when the free extraction pipeline flagged the underlying record for manual review.</summary>
     public bool NeedsManualReview { get; set; }
 
@@ -84,6 +90,13 @@ public class AiResponseDto
     /// which already combine both.
     /// </summary>
     public string? PsychometricUpsellMessage { get; set; }
+
+    /// <summary>
+    /// True when the learner's stored career-interest (RIASEC) profile was folded into this
+    /// report. For a standard (non-premium) analysis this happens automatically once the learner
+    /// has completed the assessment, so the quiz genuinely influences the dashboard.
+    /// </summary>
+    public bool PsychometricIncluded { get; set; }
 
     /// <summary>
     /// The deterministic career evidence (Part 9/10) that grounded this report's career

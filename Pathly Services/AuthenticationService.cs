@@ -8,9 +8,11 @@ using Pathly_Core.Unit;
 using Pathly_DTOs;
 using Pathly_Helper;
 using Pathly_Models;
+using Pathly_Interfaces;
 using Pathly_Interfaces.IService;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace Pathly_Services
@@ -22,6 +24,7 @@ namespace Pathly_Services
         private readonly UserManager<ApplicationUser> _UserManager;
         private readonly IConfiguration _Configuration;
         private readonly IEmailSender _EmailSender;
+        private readonly IRefreshTokenRepositoryInterface _RefreshTokens;
         private readonly AppSettings _AppSettings;
         private readonly AuthSettings _AuthSettings;
 
@@ -30,6 +33,7 @@ namespace Pathly_Services
                                      UserManager<ApplicationUser> userManager,
                                      IConfiguration configuration,
                                      IEmailSender emailSender,
+                                     IRefreshTokenRepositoryInterface refreshTokens,
                                      IOptions<AppSettings> appSettings,
                                      IOptions<AuthSettings> authSettings)
         {
@@ -38,6 +42,7 @@ namespace Pathly_Services
             _UserManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
             _Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _EmailSender = emailSender ?? throw new ArgumentNullException(nameof(emailSender));
+            _RefreshTokens = refreshTokens ?? throw new ArgumentNullException(nameof(refreshTokens));
             _AppSettings = appSettings?.Value ?? new AppSettings();
             _AuthSettings = authSettings?.Value ?? new AuthSettings();
         }
@@ -48,6 +53,13 @@ namespace Pathly_Services
             {
                 throw new ArgumentException(
                     "You must accept the Terms of Service and Privacy Policy before creating an account.");
+            }
+
+            // Reject disposable inboxes so scripted accounts can't be spun up en masse.
+            if (DisposableEmailDomains.IsDisposable(dto.Email))
+            {
+                throw new ArgumentException(
+                    "Please register with a permanent email address — disposable email providers are not accepted.");
             }
 
             var existingUser = await _Unit.User.GetTheUserByEmail(dto.Email!);
@@ -87,7 +99,7 @@ namespace Pathly_Services
             // exists and can be used immediately unless the deployment requires confirmation.
             await SendConfirmationEmailAsync(user);
 
-            return await GenerateTokenAsync(dto);
+            return await IssueTokensAsync(dto);
         }
 
         public async Task<ResponseUserDto> AuthenticateTheUserAsync(LoginDto dto)
@@ -148,7 +160,7 @@ namespace Pathly_Services
 
                 await _Unit.SaveChangesAsync();
 
-                return await GenerateTokenAsync(_Mapper.Map<UserDto>(user));
+                return await IssueTokensAsync(_Mapper.Map<UserDto>(user));
             }
 
             throw new InvalidCredentialsException("Invalid email or password");
@@ -284,7 +296,117 @@ namespace Pathly_Services
             await _EmailSender.SendAsync(user.Email, "Confirm your Pathly email address", body);
         }
 
-        private async Task<ResponseUserDto> GenerateTokenAsync(UserDto dto)
+        private async Task<ResponseUserDto> IssueTokensAsync(UserDto dto)
+        {
+            var response = BuildAccessToken(dto);
+
+            if (!string.IsNullOrWhiteSpace(dto.Id))
+            {
+                var rawRefreshToken = GenerateRawToken();
+
+                var entity = new RefreshToken
+                {
+                    RefreshTokenId = Guid.NewGuid(),
+                    ApplicationUserId = dto.Id!,
+                    TokenHash = HashToken(rawRefreshToken),
+                    CreatedAtUtc = DateTime.UtcNow,
+                    ExpiresAtUtc = DateTime.UtcNow.AddDays(RefreshTokenDays)
+                };
+
+                await _RefreshTokens.AddAsync(entity);
+                await _RefreshTokens.SaveChangesAsync();
+
+                response.RefreshToken = rawRefreshToken;
+            }
+
+            return response;
+        }
+
+        public async Task<ResponseUserDto> RefreshAsync(string refreshToken)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                throw new InvalidCredentialsException("A refresh token is required.");
+            }
+
+            var stored = await _RefreshTokens.GetByHashAsync(HashToken(refreshToken));
+
+            if (stored is null)
+            {
+                throw new InvalidCredentialsException("This session is no longer valid. Please sign in again.");
+            }
+
+            if (!stored.IsActive)
+            {
+                // A rotated/revoked token being presented again suggests theft — revoke every
+                // active token on the account defensively, then reject.
+                var active = await _RefreshTokens.GetActiveForUserAsync(stored.ApplicationUserId);
+
+                foreach (var token in active)
+                {
+                    token.RevokedAtUtc = DateTime.UtcNow;
+                    _RefreshTokens.Update(token);
+                }
+
+                if (active.Count > 0)
+                {
+                    await _RefreshTokens.SaveChangesAsync();
+                }
+
+                throw new InvalidCredentialsException("This session is no longer valid. Please sign in again.");
+            }
+
+            var user = await _UserManager.FindByIdAsync(stored.ApplicationUserId)
+                ?? throw new InvalidCredentialsException("This session is no longer valid. Please sign in again.");
+
+            // Rotate: revoke the presented token, link it to its replacement, and issue a new pair.
+            stored.RevokedAtUtc = DateTime.UtcNow;
+            var newRawToken = GenerateRawToken();
+            stored.ReplacedByTokenHash = HashToken(newRawToken);
+            _RefreshTokens.Update(stored);
+
+            var replacement = new RefreshToken
+            {
+                RefreshTokenId = Guid.NewGuid(),
+                ApplicationUserId = stored.ApplicationUserId,
+                TokenHash = HashToken(newRawToken),
+                CreatedAtUtc = DateTime.UtcNow,
+                ExpiresAtUtc = DateTime.UtcNow.AddDays(RefreshTokenDays)
+            };
+
+            await _RefreshTokens.AddAsync(replacement);
+            await _RefreshTokens.SaveChangesAsync();
+
+            var response = BuildAccessToken(_Mapper.Map<UserDto>(user));
+            response.RefreshToken = newRawToken;
+
+            return response;
+        }
+
+        public async Task RevokeRefreshTokenAsync(string refreshToken)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                return;
+            }
+
+            var stored = await _RefreshTokens.GetByHashAsync(HashToken(refreshToken));
+
+            if (stored is null || stored.RevokedAtUtc is not null)
+            {
+                return;
+            }
+
+            stored.RevokedAtUtc = DateTime.UtcNow;
+            _RefreshTokens.Update(stored);
+            await _RefreshTokens.SaveChangesAsync();
+        }
+
+        private int RefreshTokenDays => _AuthSettings.RefreshTokenDays > 0 ? _AuthSettings.RefreshTokenDays : 30;
+
+        private int AccessTokenMinutes => _AuthSettings.AccessTokenMinutes > 0 ? _AuthSettings.AccessTokenMinutes : 60;
+
+        private ResponseUserDto BuildAccessToken(UserDto dto)
         {
             var jwtKey = _Configuration["Jwt:Key"];
             var jwtIssuer = _Configuration["Jwt:Issuer"];
@@ -314,7 +436,7 @@ namespace Pathly_Services
                     issuer: jwtIssuer,
                     audience: jwtAudience,
                     claims: claims,
-                    expires: DateTime.UtcNow.AddHours(24),
+                    expires: DateTime.UtcNow.AddMinutes(AccessTokenMinutes),
                     signingCredentials: creds
                 );
 
@@ -326,6 +448,16 @@ namespace Pathly_Services
                 UserId = dto.Id,
                 FullName = dto.FullName
             };
+        }
+
+        private static string GenerateRawToken()
+        {
+            return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        }
+
+        private static string HashToken(string rawToken)
+        {
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
         }
     }
 }

@@ -24,6 +24,7 @@ namespace Pathly_Services
         private readonly ISubjectKnowledgeService _SubjectKnowledge;
         private readonly ICareerEvidenceService _CareerEvidence;
         private readonly IAcademicPredictionService _AcademicPrediction;
+        private readonly IProgressionService _Progression;
         private readonly IGroqService _Groq;
         private readonly IMapper _Mapper;
         private readonly IUnitOfWork _Unit;
@@ -34,6 +35,7 @@ namespace Pathly_Services
                                     ISubjectKnowledgeService subjectKnowledge,
                                     ICareerEvidenceService careerEvidence,
                                     IAcademicPredictionService academicPrediction,
+                                    IProgressionService progression,
                                     IGroqService groq,
                                     IMapper mapper,
                                     IUnitOfWork unit,
@@ -44,6 +46,7 @@ namespace Pathly_Services
             _SubjectKnowledge = subjectKnowledge ?? throw new ArgumentNullException(nameof(subjectKnowledge));
             _CareerEvidence = careerEvidence ?? throw new ArgumentNullException(nameof(careerEvidence));
             _AcademicPrediction = academicPrediction ?? throw new ArgumentNullException(nameof(academicPrediction));
+            _Progression = progression ?? throw new ArgumentNullException(nameof(progression));
             _Groq = groq ?? throw new ArgumentNullException(nameof(groq));
             _Mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _Unit = unit ?? throw new ArgumentNullException(nameof(unit));
@@ -172,6 +175,10 @@ namespace Pathly_Services
                 await PersistExtractedRecordAsync(academicRecord);
             }
 
+            // Merge every prior upload into a longitudinal series so the premium report also
+            // reflects the learner's progress over time.
+            academicRecord.Progression = await _Progression.BuildForUserAsync(applicationUserId ?? string.Empty);
+
             await _SubjectKnowledge.EnsureSubjectsPersistedAsync(academicRecord.Subjects);
             await PersistPsychometricProfileAsync(psychometricProfile, applicationUserId);
 
@@ -196,9 +203,20 @@ namespace Pathly_Services
 
             ReconcileApsAnalysis(aiResponse, apsResult, academicRecord);
 
+            // Deterministic guard: keep the roadmap on the single institution the top career names
+            // (same check as Layer 1) so a premium report can never contradict itself either.
+            var coherence = CareerPathCoherenceValidator.ValidateAndRepair(aiResponse);
+
             aiResponse.CareerEvidence = careerEvidence;
+            aiResponse.PsychometricIncluded = true;
             // Premium reports already combine both layers � no upsell needed (Part 8).
             aiResponse.PsychometricUpsellMessage = null;
+
+            // Set the record-derived extras BEFORE serialization so a reopened report keeps them.
+            aiResponse.AcademicPrediction = academicRecord.AcademicPrediction;
+            aiResponse.Progression = academicRecord.Progression;
+            aiResponse.NeedsManualReview = academicRecord.NeedsManualReview || coherence.NeedsManualReview;
+            aiResponse.ExtractionWarnings = MergeWarnings(academicRecord.ExtractionWarnings, coherence.Warnings);
 
             var apsAnalysisId = Guid.NewGuid();
 
@@ -278,9 +296,6 @@ namespace Pathly_Services
             aiResponse.DriverTermLabel = llmResponse.DriverTermLabel;
             aiResponse.IsPremium = true;
             aiResponse.GeneratedAt = llmResponse.AddedAt;
-            aiResponse.AcademicPrediction = academicRecord.AcademicPrediction;
-            aiResponse.NeedsManualReview = academicRecord.NeedsManualReview;
-            aiResponse.ExtractionWarnings = academicRecord.ExtractionWarnings;
 
             if (servedFromCache)
             {
@@ -452,6 +467,14 @@ namespace Pathly_Services
         private static string? SerializeList(List<string>? list)
         {
             return list is null or { Count: 0 } ? null : JsonSerializer.Serialize(list);
+        }
+
+        private static List<string> MergeWarnings(List<string>? existing, List<string>? additional)
+        {
+            var merged = new List<string>();
+            if (existing is not null) merged.AddRange(existing);
+            if (additional is not null) merged.AddRange(additional);
+            return merged;
         }
 
         private void ReconcileApsAnalysis(AiResponseDto aiResponse, ApsResultDto apsResult, ExtractedAcademicRecordDto? record)

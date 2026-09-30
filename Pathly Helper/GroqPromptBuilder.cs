@@ -8,7 +8,7 @@ namespace Pathly_Helper
         /// Bump whenever the prompt template changes materially, so cached results generated
         /// under an old prompt stop being served automatically (Part 5).
         /// </summary>
-        public const string PromptVersion = "2.1";
+        public const string PromptVersion = "2.2";
 
         private static string BuildEvidenceSection(IReadOnlyList<CareerEvidenceDto>? careerEvidence)
         {
@@ -84,7 +84,11 @@ namespace Pathly_Helper
                 - Every career's universityCourse must be a single, real SA programme at one named
                   institution, and must not contradict universitiesTheyQualifyFor / universitiesTheyDoNotQualifyFor.
                 - A learner cannot be simultaneously doing a degree at one university and a course at
-                  another; pick the realistic single path and describe that.";
+                  another; pick the realistic single path and describe that.
+                - Use exact, real institution names (e.g. ""University of Pretoria"", ""University of
+                  Cape Town"", ""University of the Witwatersrand"", ""Stellenbosch University""). A
+                  deterministic check will align any roadmap step to the top career's institution, so
+                  be consistent from the start.";
         }
 
         private static string FormatSubjectLine(ExtractedSubjectDto s)
@@ -228,6 +232,7 @@ namespace Pathly_Helper
             var evidenceSection = BuildEvidenceSection(careerEvidence);
             var psychometricSection = BuildPsychometricSection(psychometricProfile);
             var predictionSection = BuildPredictionSection(record);
+            var progressionSection = BuildProgressionSection(record);
             var driverBlockLabel = BuildDriverLabel(record);
             var universityListInstruction = isGated
                 ? "NOTE: this is a mid-year/non-final report (not final NSC results). Do NOT emit a hard " +
@@ -249,7 +254,7 @@ namespace Pathly_Helper
             {subjectSummary}
 
             APS Score: {apsResult.TotalAps} | APS Level: {apsResult.QualificationLevel}
-            {evidenceSection}{psychometricSection}{predictionSection}
+            {evidenceSection}{psychometricSection}{predictionSection}{progressionSection}
             {universityListInstruction}
             {referenceUniversities}
 
@@ -389,6 +394,23 @@ namespace Pathly_Helper
 
             At-risk subjects to prioritise in improvement advice: {atRisk}
             ({prediction.Caveat})
+";
+        }
+
+        private static string BuildProgressionSection(ExtractedAcademicRecordDto record)
+        {
+            var progression = record?.Progression;
+
+            if (progression is null || !progression.IsAvailable)
+            {
+                return string.Empty;
+            }
+
+            return $@"
+            Long-term progression across the learner's uploads (Pathly merged {progression.UploadCount} uploaded
+            record(s) into {progression.PeriodCount} reporting periods): {progression.Summary}
+            Use this history when writing improvement advice and the roadmap so the guidance builds on the
+            learner's progress over time. Never contradict these trends.
 ";
         }
     }

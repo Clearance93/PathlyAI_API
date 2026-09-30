@@ -86,6 +86,7 @@ namespace Pathly_Services
                 RatingAnswersJson = Serialize(submission.RatingAnswers),
                 TrueFalseAnswersJson = Serialize(submission.TrueFalseAnswers),
                 MultipleChoiceAnswersJson = Serialize(submission.MultipleChoiceAnswers),
+                ReportJson = submission.ReportJson,
                 TotalQuestions = totalQuestions,
                 AnsweredQuestions = totalQuestions,
                 ResultFingerprint = resultFingerprint,
@@ -170,6 +171,7 @@ namespace Pathly_Services
                 MultipleChoiceAnswers = Deserialize<string>(assessment.MultipleChoiceAnswersJson),
                 TotalQuestions = assessment.TotalQuestions,
                 AnsweredQuestions = assessment.AnsweredQuestions,
+                ReportJson = assessment.ReportJson,
                 ServedFromExisting = servedFromExisting,
                 CompletedAt = assessment.CompletedAt
             };

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Pathly_Data;
 
@@ -11,9 +12,11 @@ using Pathly_Data;
 namespace Pathly_Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929160216_AddPsychometricAssessmentReport")]
+    partial class AddPsychometricAssessmentReport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1076,44 +1079,6 @@ namespace Pathly_Data.Migrations
                     b.ToTable("PsychometricProfiles");
                 });
 
-            modelBuilder.Entity("Pathly_Models.RefreshToken", b =>
-                {
-                    b.Property<Guid>("RefreshTokenId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ApplicationUserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ReplacedByTokenHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<DateTime?>("RevokedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.HasKey("RefreshTokenId");
-
-                    b.HasIndex("ApplicationUserId");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique();
-
-                    b.ToTable("RefreshTokens");
-                });
-
             modelBuilder.Entity("Pathly_Models.Subject", b =>
                 {
                     b.Property<Guid>("SubjectId")
@@ -1468,17 +1433,6 @@ namespace Pathly_Data.Migrations
                         .WithMany()
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("ApplicationUser");
-                });
-
-            modelBuilder.Entity("Pathly_Models.RefreshToken", b =>
-                {
-                    b.HasOne("Pathly_Models.ApplicationUser", "ApplicationUser")
-                        .WithMany()
-                        .HasForeignKey("ApplicationUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("ApplicationUser");
                 });

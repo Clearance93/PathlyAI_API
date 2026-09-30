@@ -21,5 +21,11 @@ namespace Pathly_DTOs
 
         /// <summary>The RIASEC scores the UI computed for this exact answer set.</summary>
         public PsychometricProfileDto Profile { get; set; } = new();
+
+        /// <summary>
+        /// Optional full detailed report (the UI's computed interpretation) as JSON. When supplied
+        /// it is stored so the rich report can be restored on any device.
+        /// </summary>
+        public string? ReportJson { get; set; }
     }
 }

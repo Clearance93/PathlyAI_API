@@ -52,5 +52,22 @@ namespace PathlyRepository
                 .OrderByDescending(r => r.ExtractedAt)
                 .ToListAsync();
         }
+
+        public async Task<List<ExtractedAcademicRecord>> GetAllWithHistoryForUserAsync(string applicationUserId)
+        {
+            if (string.IsNullOrWhiteSpace(applicationUserId))
+            {
+                return new List<ExtractedAcademicRecord>();
+            }
+
+            return await _context.ExtractedAcademicRecords
+                .AsNoTracking()
+                .Include(r => r.Subjects)
+                .Include(r => r.AcademicPeriods)
+                    .ThenInclude(p => p.Subjects)
+                .Where(r => r.ApplicationUserId == applicationUserId)
+                .OrderBy(r => r.ExtractedAt)
+                .ToListAsync();
+        }
     }
 }

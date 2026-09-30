@@ -6,7 +6,7 @@ WORKDIR /src
 COPY ["PathlyAI_API/PathlyAI_API.csproj", "PathlyAI_API/"]
 COPY ["Pathly Data/Pathly Data.csproj", "Pathly Data/"]
 COPY ["Pathly Utility/Pathly Utility.csproj", "Pathly Utility/"]
-COPY ["PathlyInterfaces/PathlyInterfaces.csproj", "PathlyInterfaces/"]
+COPY ["Pathly_Interfaces/Pathly_Interfaces.csproj", "Pathly_Interfaces/"]
 COPY ["Pathly Models/Pathly Models.csproj", "Pathly Models/"]
 COPY ["Pathly DTOs/Pathly DTOs.csproj", "Pathly DTOs/"]
 COPY ["Pathly Enums/Pathly Enums.csproj", "Pathly Enums/"]

@@ -30,6 +30,13 @@ namespace Pathly_Models
         /// <summary>JSON map of multiple-choice question id → chosen RIASEC key.</summary>
         public string? MultipleChoiceAnswersJson { get; set; }
 
+        /// <summary>
+        /// The full, detailed assessment report (interpretation, strengths, development areas,
+        /// career matches) as JSON. Persisted so the rich report is durable and available on any
+        /// device, instead of living only in the browser's local storage.
+        /// </summary>
+        public string? ReportJson { get; set; }
+
         public int TotalQuestions { get; set; }
 
         public int AnsweredQuestions { get; set; }
