@@ -55,6 +55,11 @@ namespace Pathly_Services
                     "You must accept the Terms of Service and Privacy Policy before creating an account.");
             }
 
+            if (string.IsNullOrWhiteSpace(dto.Password))
+            {
+                throw new ArgumentException("A password is required to create an account.");
+            }
+
             // Reject disposable inboxes so scripted accounts can't be spun up en masse.
             if (DisposableEmailDomains.IsDisposable(dto.Email))
             {
@@ -82,7 +87,7 @@ namespace Pathly_Services
             user.TermsVersion = _AppSettings.TermsVersion;
             user.MarketingConsent = dto.MarketingConsent;
 
-            var result = await _UserManager.CreateAsync(user);
+            var result = await _UserManager.CreateAsync(user, dto.Password);
 
             if (!result.Succeeded)
             {
