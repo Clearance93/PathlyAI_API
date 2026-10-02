@@ -20,11 +20,10 @@ namespace Pathly_Utility
         {
             services.AddHttpClient();
 
-            // Typed clients: plain AddScoped<GroqService>()/AddScoped<AzureModelRouterService>()
-            // can't resolve a bare HttpClient constructor parameter � this is what actually
-            // gives each service a managed HttpClient instance.
+            // Typed clients: plain AddScoped<GroqService>() can't resolve a bare HttpClient
+            // constructor parameter � this is what actually gives each service a managed
+            // HttpClient instance.
             services.AddHttpClient<GroqService>();
-            services.AddHttpClient<AzureModelRouterService>();
             services.AddHttpClient<TurnstileVerificationService>();
 
             services.AddSingleton(provider =>
@@ -46,7 +45,6 @@ namespace Pathly_Utility
             });
 
             services.Configure<GroqSettings>(configuratio.GetSection("Groq"));
-            services.Configure<AzureFoundrySettings>(configuratio.GetSection("AzureOpenAI"));
             services.Configure<CareerMatchWeightsOptions>(configuratio.GetSection("CareerMatchWeights"));
             services.Configure<PaystackSettings>(configuratio.GetSection("Paystack"));
             services.Configure<SmtpSettings>(configuratio.GetSection("Smtp"));
@@ -100,17 +98,12 @@ namespace Pathly_Utility
             services.AddScoped<IProgressionService, ProgressionService>();
             services.AddScoped<ICaptchaVerificationService>(sp => sp.GetRequiredService<TurnstileVerificationService>());
 
-            // Groq-only for now (Azure AI Foundry temporarily disabled � everything Azure-related
-            // is left in place below, untouched, so this is a one-line flip back to
-            // ResilientCareerAiService whenever Azure is wanted again).
-            services.AddScoped<IPrimaryCareerAiProvider>(sp => sp.GetRequiredService<GroqService>());
-            services.AddScoped<IFallbackCareerAiProvider>(sp => sp.GetRequiredService<AzureModelRouterService>());
+            // Career analysis runs on Groq, the cheapest provider available.
             services.AddScoped<IGroqService>(sp => sp.GetRequiredService<GroqService>());
 
             // Document extraction structuring: Groq only, by design (Part: free document
-            // extraction). No Azure fallback here � unlike career analysis, this step is cheap
-            // and low-stakes enough that we accept occasional retries rather than paying for a
-            // paid fallback provider. Wrapped in self-validation/retry so a hallucinated or
+            // extraction). This step is cheap and low-stakes enough that we accept occasional
+            // retries rather than paying for a fallback provider. Wrapped in self-validation/retry so a hallucinated or
             // incomplete extraction gets a second (and third) attempt before it's trusted.
             services.AddScoped<IDocumentStructuringService>(sp =>
                 new SelfValidatingDocumentStructuringService(

@@ -13,14 +13,14 @@ using System.Text.RegularExpressions;
 
 namespace Pathly_Services
 {
-    public class GroqService : IGroqService, IPrimaryCareerAiProvider, IDocumentStructuringService
+    public class GroqService : IGroqService, IDocumentStructuringService
     {
         private readonly HttpClient _HttpClient;
         private readonly GroqSettings _GroqSettings;
         private readonly ILogger<GroqService> _Logger;
         private readonly List<GroqKeySettings> _AllKeys;
 
-        // Rotated on every request so consecutive calls start on different keys — this spreads
+        // Rotated on every request so consecutive calls start on different keys ï¿½ this spreads
         // each key's tokens-per-minute budget across the whole key pool instead of always
         // hammering key 1 until it 429s and only then falling back.
         private static int _KeyRotationIndex;
@@ -92,7 +92,7 @@ namespace Pathly_Services
                 }
 
                 // A flat key may share a Name with a placeholder array entry from appsettings.json
-                // whose GroqApiKey is empty. Prefer the real key from configuration — replace the
+                // whose GroqApiKey is empty. Prefer the real key from configuration ï¿½ replace the
                 // placeholder instead of skipping the real key as a "duplicate".
                 var matchingName = keys.FirstOrDefault(k => k.Name == flat.Name);
                 if (matchingName is not null)
@@ -139,7 +139,7 @@ namespace Pathly_Services
             var userPrompt = GroqPromptBuilder.BuildUserPrompt(academicRecord, apsResult, careerEvidence, psychometricProfile);
 
             // Analysis output (feedback, roadmap, career matches, study tips, etc.) is much longer
-            // than an extraction JSON, so it gets a higher floor/ceiling than extraction — but it's
+            // than an extraction JSON, so it gets a higher floor/ceiling than extraction ï¿½ but it's
             // still computed from actual prompt size instead of a flat 8000, which is what caused
             // the 413 here: a flat request guarantees overage on the TPM cap the moment the prompt
             // (academic record + APS + career evidence + psychometric profile) has any real size.
@@ -149,10 +149,10 @@ namespace Pathly_Services
         }
 
         /// <summary>
-        /// Free replacement for Azure Document Intelligence's layout/field parsing. Takes raw text
-        /// already pulled from the file (via PdfPig or Tesseract OCR — see DocumentExtractionService)
+        /// Structures raw text into an academic record. Takes text
+        /// already pulled from the file (via PdfPig or Tesseract OCR ï¿½ see DocumentExtractionService)
         /// and asks Groq to reason it into a structured academic record. No Subjects/RawExtractedText
-        /// bookkeeping happens here — that's the caller's responsibility.
+        /// bookkeeping happens here ï¿½ that's the caller's responsibility.
         /// </summary>
         public async Task<ExtractedAcademicRecordDto> StructureAcademicRecordAsync(string rawText)
         {
@@ -164,7 +164,7 @@ namespace Pathly_Services
             var systemPrompt = GroqPromptBuilder.BuildDocumentExtractionSystemPrompt();
             var userPrompt = GroqPromptBuilder.BuildDocumentExtractionUserPrompt(rawText);
 
-            // Extraction JSON is small even for a long transcript — DocumentExtractionService also
+            // Extraction JSON is small even for a long transcript ï¿½ DocumentExtractionService also
             // caps input text upstream, so 1200 as a floor is safe here (see the "never force above
             // available" note on AnalyzeAcademicRecordAsync above for why that floor is lower there).
             var maxTokens = EstimateMaxTokens(systemPrompt, userPrompt, floorTokens: 1200, ceilingTokens: 4000);
@@ -175,7 +175,7 @@ namespace Pathly_Services
         // Groq's free/on_demand tier enforces a tokens-per-minute cap covering prompt +
         // requested completion combined (8000 TPM at time of writing for openai/gpt-oss-120b). A
         // flat completion budget either wastes headroom on short requests or guarantees overage on
-        // larger ones (exactly what caused the 413 seen against AnalyzeAcademicRecordAsync — its
+        // larger ones (exactly what caused the 413 seen against AnalyzeAcademicRecordAsync ï¿½ its
         // max_tokens was flatly 8000 regardless of how big the prompt already was), so both calls
         // scale their request off actual prompt size instead:
         //   1. Roughly estimate prompt tokens (~4 characters per token is a standard approximation
@@ -183,7 +183,7 @@ namespace Pathly_Services
         //   2. Leave a safety margin so we don't shave the request right up to the TPM ceiling.
         //   3. Clamp to a floor/ceiling appropriate to the call. NOTE: if the prompt itself is
         //      already large enough that "available" falls below the floor, the floor wins and the
-        //      request can still exceed budget — that's an intentional trade-off (a too-short
+        //      request can still exceed budget ï¿½ that's an intentional trade-off (a too-short
         //      completion is recoverable via the truncation check below + retry; a request that's
         //      too small to be useful isn't worth sending at all). Callers with no upstream cap on
         //      prompt size (AnalyzeAcademicRecordAsync) use a lower floor for exactly this reason;
@@ -206,7 +206,7 @@ namespace Pathly_Services
         //      consecutive requests spread their TPM load across keys instead of concentrating
         //      on the first one.
         //   2. On a 429 (or an unusable/truncated response) it moves to the NEXT key immediately
-        //      rather than sleeping — a different key's TPM window is almost certainly still open.
+        //      rather than sleeping ï¿½ a different key's TPM window is almost certainly still open.
         //   3. Only after a full pass over every key does it wait out the longest rate-limit delay
         //      Groq reported and try the key pool once more (skipping keys that failed with a
         //      non-retryable error such as an invalid key).
@@ -245,7 +245,7 @@ namespace Pathly_Services
 
                     var delay = rateLimitDelay ?? TimeSpan.FromSeconds(30);
                     _Logger.LogWarning(
-                        "All {KeyCount} Groq key(s) hit their rate limit or returned unusable content — waiting {Delay:0.#}s before one more pass.",
+                        "All {KeyCount} Groq key(s) hit their rate limit or returned unusable content ï¿½ waiting {Delay:0.#}s before one more pass.",
                         keys.Count, delay.TotalSeconds);
 
                     await Task.Delay(delay);
@@ -294,7 +294,7 @@ namespace Pathly_Services
                         }
                         catch (Exception ex) when (ex is InvalidOperationException or JsonException)
                         {
-                            // HTTP 200 but the content is truncated/unparsable — treat it like any
+                            // HTTP 200 but the content is truncated/unparsable ï¿½ treat it like any
                             // other failure and let the next key take the work.
                             lastError = $"Groq key '{keyName}' returned unusable content: {ex.Message}";
                             sawRetryableFailure = true;
@@ -312,14 +312,14 @@ namespace Pathly_Services
                         sawRetryableFailure = true;
 
                         _Logger.LogWarning(
-                            "Groq rate limit hit on key '{KeyName}' — moving to the next key ({Offset}/{KeyCount}).",
+                            "Groq rate limit hit on key '{KeyName}' ï¿½ moving to the next key ({Offset}/{KeyCount}).",
                             keyName, offset + 1, keys.Count);
 
                         continue;
                     }
 
                     _Logger.LogWarning(
-                        "Groq key '{KeyName}' failed with a non-retryable error ({StatusCode}) — skipping it for the rest of this request.",
+                        "Groq key '{KeyName}' failed with a non-retryable error ({StatusCode}) ï¿½ skipping it for the rest of this request.",
                         keyName, response.StatusCode);
 
                     skippedKeys.Add(keyName);
@@ -468,7 +468,7 @@ namespace Pathly_Services
                 .ThenByDescending(p => p.Ordinal)
                 .ToList();
 
-            // Multi-term documents: the analysis driver is the highest-priority POPULATED block —
+            // Multi-term documents: the analysis driver is the highest-priority POPULATED block ï¿½
             // a Final/Promotion block wins, otherwise the highest populated term ordinal. Legacy
             // model responses (flat "subjects" with no "periods") fall back to the parsed legacy
             // Subjects, treated as an "Overall / Final" driver so history stays lossless.
@@ -552,7 +552,7 @@ namespace Pathly_Services
 
         /// <summary>
         /// Mirrors the shape of the JSON schema requested in
-        /// <see cref="GroqPromptBuilder.BuildDocumentExtractionUserPrompt"/>. Kept private/internal —
+        /// <see cref="GroqPromptBuilder.BuildDocumentExtractionUserPrompt"/>. Kept private/internal ï¿½
         /// this is purely a deserialization shim, never exposed outside GroqService.
         /// </summary>
         private class GroqExtractionResponse
@@ -566,7 +566,7 @@ namespace Pathly_Services
             public string? AdmissionNo { get; set; }
             public List<GroqAcademicPeriod>? Periods { get; set; }
 
-            // Legacy flat shape some models still return — kept so a missing "periods" degrades
+            // Legacy flat shape some models still return ï¿½ kept so a missing "periods" degrades
             // gracefully into a single Overall/Final driver instead of dropping all subjects.
             public List<GroqExtractedSubject>? Subjects { get; set; }
         }

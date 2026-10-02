@@ -5,17 +5,15 @@ using Pathly_Interfaces.IService;
 namespace Pathly_Services
 {
     /// <summary>
-    /// Extracts structured academic records from uploaded transcripts without any paid third-party
-    /// document AI. Replaces the previous Azure Document Intelligence (prebuilt-layout) pipeline
-    /// with a fully free stack:
+    /// Extracts structured academic records from uploaded transcripts using a fully free stack:
     ///
     ///   1. Raw text extraction � PdfPig for born-digital PDFs, Tesseract OCR for photos/scans.
     ///   2. Quality gate � the OCR output is checked for the fingerprints of a failed table read
     ///      (broken subject names, marks detached from rows) before it is trusted.
     ///   3. Intelligent structuring � Groq (already used elsewhere in Pathly, generous free tier)
     ///      reasons over the raw text to produce subjects/marks/student/institution fields. This
-    ///      is what gives us "intelligence" close to Azure's layout AI, and it's actually more
-    ///      tolerant of messy OCR output than the old regex/table-cell heuristics were.
+    ///      is what gives us the "intelligence", and it's actually more tolerant of messy OCR
+    ///      output than the old regex/table-cell heuristics were.
     /// </summary>
     public class DocumentExtractionService : IDocumentExtractionService
     {

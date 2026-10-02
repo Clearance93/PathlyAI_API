@@ -16,8 +16,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("PathlyConnection"),
-        // Azure SQL intermittently drops connections — retry transparently instead of surfacing
-        // a 500 to the learner.
+        // SQL Server can intermittently drop connections — retry transparently instead of
+        // surfacing a 500 to the learner.
         sql => sql.EnableRetryOnFailure());
 });
 

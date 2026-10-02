@@ -3,10 +3,10 @@ using Tesseract;
 namespace Pathly_Services
 {
     /// <summary>
-    /// Free, open-source replacement for Azure Document Intelligence's OCR, used when the upload
-    /// is a photo/scan of a transcript rather than a born-digital PDF (see
+    /// Free, open-source OCR, used when the upload is a photo/scan of a transcript rather than a
+    /// born-digital PDF (see
     /// <see cref="PdfTextExtractor"/> for that case). Tesseract is Apache-2.0 licensed and runs
-    /// entirely locally — no per-page cost, no external API call.
+    /// entirely locally ï¿½ no per-page cost, no external API call.
     ///
     /// Requires the "eng.traineddata" file to be present in a "tessdata" folder next to the
     /// running executable. See PathlyAI_API/Tessdata-README.md and
@@ -19,7 +19,7 @@ namespace Pathly_Services
         private const float UpscaleFactor = 2.0f;
 
         // "user_defined_dpi" tells Tesseract the effective resolution of the (already upscaled)
-        // image so its character-size heuristics behave — it does not re-rasterize.
+        // image so its character-size heuristics behave ï¿½ it does not re-rasterize.
         private const int EffectiveDpi = 300;
 
         // Tolerances for reconstructing table rows from word bounding boxes (mirrors
@@ -177,7 +177,7 @@ namespace Pathly_Services
 
         /// <summary>
         /// Grayscale + deskew before OCR. Phone photos of report cards are the main source of
-        /// error here (color noise, slight rotation) — both corrections are well-established
+        /// error here (color noise, slight rotation) ï¿½ both corrections are well-established
         /// Tesseract accuracy improvements and are already bundled in the Tesseract/Leptonica
         /// native libraries, so this costs nothing extra to run. Falls back to the original image
         /// if either step throws (e.g. an already-grayscale or already-1bpp source image).
@@ -192,7 +192,7 @@ namespace Pathly_Services
             }
             catch
             {
-                // Already grayscale/not RGB — proceed with the original.
+                // Already grayscale/not RGB ï¿½ proceed with the original.
             }
 
             try
