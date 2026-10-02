@@ -8,6 +8,12 @@ namespace Pathly_DTOs
 
         public string? FullName { get; set; }
 
+        /// <summary>Optional separate name parts. Composed into <see cref="FullName"/> when it is
+        /// not supplied, so clients may send either shape.</summary>
+        public string? FirstName { get; set; }
+
+        public string? LastName { get; set; }
+
         public string? Password { get; set; }
 
         public string? ProfilePictures { get; set; }

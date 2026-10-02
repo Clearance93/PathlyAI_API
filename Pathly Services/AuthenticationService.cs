@@ -78,9 +78,20 @@ namespace Pathly_Services
 
             user.Id = Guid.NewGuid().ToString();
             user.CreatedAt = DateTime.UtcNow;
+            // Clients send the name either as a single FullName or as separate FirstName/LastName
+            // parts — compose it from whichever was supplied so the name is never silently dropped.
+            var fullName = string.IsNullOrWhiteSpace(dto.FullName)
+                ? string.Join(' ', new[] { dto.FirstName, dto.LastName }
+                    .Where(part => !string.IsNullOrWhiteSpace(part))
+                    .Select(part => part!.Trim()))
+                : dto.FullName.Trim();
+
             user.UserName = dto.Email;
             user.PhoneNumber = dto.PhoneNumber;
-            user.FullName = dto.FullName;
+            user.FullName = string.IsNullOrWhiteSpace(fullName) ? null : fullName;
+
+            // Carry the composed name back so the registration response includes it.
+            dto.FullName = user.FullName;
 
             // POPIA: record exactly what was consented to and when. Marketing is opt-in only.
             user.TermsAcceptedAtUtc = DateTime.UtcNow;
