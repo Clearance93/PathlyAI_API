@@ -1,4 +1,6 @@
 using System.Text;
+using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -63,6 +65,43 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(GetJwtKey(builder.Configuration))),
             ClockSkew = TimeSpan.FromMinutes(1)
+        };
+
+        // JWTs are otherwise valid until expiry even after a password reset. Compare the
+        // Identity security-stamp claim on every request so a reset immediately invalidates all
+        // outstanding access tokens, not only the refresh-token sessions.
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userId = context.Principal?.FindFirstValue("extension_userId");
+                var tokenStampHash = context.Principal?.FindFirstValue("security_stamp_hash");
+
+                if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(tokenStampHash))
+                {
+                    context.Fail("The access token is no longer valid.");
+                    return;
+                }
+
+                var userManager = context.HttpContext.RequestServices
+                    .GetRequiredService<UserManager<ApplicationUser>>();
+                var user = await userManager.FindByIdAsync(userId);
+                var currentStamp = user is null ? null : await userManager.GetSecurityStampAsync(user);
+
+                if (string.IsNullOrWhiteSpace(currentStamp))
+                {
+                    context.Fail("The access token is no longer valid.");
+                    return;
+                }
+
+                var tokenStampBytes = Convert.FromHexString(tokenStampHash);
+                var currentStampBytes = SHA256.HashData(Encoding.UTF8.GetBytes(currentStamp));
+                if (tokenStampBytes.Length != currentStampBytes.Length ||
+                    !CryptographicOperations.FixedTimeEquals(tokenStampBytes, currentStampBytes))
+                {
+                    context.Fail("The access token is no longer valid.");
+                }
+            }
         };
     });
 

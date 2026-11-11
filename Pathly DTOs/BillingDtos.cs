@@ -31,7 +31,22 @@ namespace Pathly_DTOs
 
         public string? Reference { get; set; }
 
+        /// <summary>The catalogue code of the plan being purchased/activated.</summary>
+        public string? PlanCode { get; set; }
+
+        public string? PlanName { get; set; }
+
         public string? Message { get; set; }
+    }
+
+    /// <summary>What the SPA needs to know before rendering the checkout page.</summary>
+    public class BillingConfigDto
+    {
+        /// <summary>False while no payment provider credentials are configured.</summary>
+        public bool PaymentsEnabled { get; set; }
+
+        /// <summary>True only when a signed-in user may activate a plan without paying (dev only).</summary>
+        public bool DevActivationEnabled { get; set; }
     }
 
     /// <summary>The caller's live entitlement state: current plan + month-to-date consumption.</summary>
@@ -50,6 +65,9 @@ namespace Pathly_DTOs
         public int? MonthlyPsychometricQuota { get; set; }
 
         public bool PremiumAnalysisUnlocked { get; set; }
+
+        /// <summary>True only when the plan includes psychometrics (Premium or legacy equivalents).</summary>
+        public bool PsychometricsUnlocked { get; set; }
 
         public int CreditBalance { get; set; }
 

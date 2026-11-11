@@ -54,6 +54,13 @@ namespace Pathly_Services
                 payload["plan"] = providerPlanCode;
             }
 
+            // Bring the browser back to the SPA after payment so the plan can be confirmed
+            // immediately, instead of stranding the user on the provider receipt page.
+            if (!string.IsNullOrWhiteSpace(_Settings.CallbackUrl))
+            {
+                payload["callback_url"] = _Settings.CallbackUrl;
+            }
+
             using var request = new HttpRequestMessage(HttpMethod.Post, $"{_Settings.BaseUrl.TrimEnd('/')}/transaction/initialize")
             {
                 Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
@@ -90,6 +97,51 @@ namespace Pathly_Services
             }
 
             return new GatewayCheckoutResult { Success = false, ErrorMessage = "Unexpected response from the payment provider." };
+        }
+
+        public async Task<GatewayVerificationResult?> VerifyTransactionAsync(string reference)
+        {
+            if (!IsConfigured || string.IsNullOrWhiteSpace(reference))
+            {
+                return null;
+            }
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"{_Settings.BaseUrl.TrimEnd('/')}/transaction/verify/{Uri.EscapeDataString(reference)}");
+
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _Settings.SecretKey.Trim());
+
+            var response = await _HttpClient.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _Logger.LogWarning("Paystack verify failed ({StatusCode}): {Body}", (int)response.StatusCode, body);
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(body);
+
+            if (!doc.RootElement.TryGetProperty("data", out var data))
+            {
+                return null;
+            }
+
+            var status = data.TryGetProperty("status", out var s) ? s.GetString() : null;
+            string? providerRef = null;
+
+            if (data.TryGetProperty("id", out var id))
+            {
+                providerRef = id.ValueKind == JsonValueKind.Number ? id.GetInt64().ToString() : id.ToString();
+            }
+
+            return new GatewayVerificationResult
+            {
+                Paid = string.Equals(status, "success", StringComparison.OrdinalIgnoreCase),
+                ProviderTransactionRef = providerRef,
+                ErrorMessage = status
+            };
         }
 
         public bool VerifyWebhookSignature(string rawBody, string signatureHeader)

@@ -1,11 +1,10 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Pathly_DTOs;
 using Pathly_Enums;
 using Pathly_Helper;
 using Pathly_Interfaces.IService;
+using System.Security.Claims;
 
 namespace PathlyAI_API.Controllers
 {
@@ -14,10 +13,6 @@ namespace PathlyAI_API.Controllers
     [Authorize]
     public class AcademicAnalysisController : ControllerBase
     {
-        // Max uploaded document size: 5 MB. Phone photos are typically 3-8 MB as JPEG, so this
-        // comfortably accepts today's phone cameras while bounding memory/time on the server.
-        // Kestrel's default request body limit (~30 MB) is far above this, so a 5 MB cap needs
-        // no server-level change � this guard just gives a clean, early error past the limit.
         private const long MaxUploadBytes = 5 * 1024 * 1024;
 
         private readonly ICareerAnalysisService _CareerService;
@@ -36,10 +31,6 @@ namespace PathlyAI_API.Controllers
             _AnalysisQuery = analysisQuery ?? throw new ArgumentNullException(nameof(analysisQuery));
         }
 
-        /// <summary>
-        /// Rough decoded-byte size of a base64 string, without allocating the decoded buffer.
-        /// Standard base64: 4 chars ? 3 bytes. Good enough for a size gate.
-        /// </summary>
         private static long EstimateDecodedSize(string base64)
         {
             var len = base64.Length;
@@ -242,10 +233,6 @@ namespace PathlyAI_API.Controllers
             }
         }
 
-        /// <summary>
-        /// The logged-in learner's stored analysis history (newest first) plus an APS trend.
-        /// Strictly scoped to the caller's account.
-        /// </summary>
         [HttpGet("history")]
         public async Task<IActionResult> GetHistory()
         {
@@ -259,7 +246,6 @@ namespace PathlyAI_API.Controllers
             return Ok(await _AnalysisQuery.GetHistoryAsync(userId));
         }
 
-        /// <summary>A single stored report — returned only if it belongs to the caller.</summary>
         [HttpGet("{aiResponseId:guid}")]
         public async Task<IActionResult> GetResult(Guid aiResponseId)
         {
@@ -280,11 +266,6 @@ namespace PathlyAI_API.Controllers
             return Ok(result);
         }
 
-        /// <summary>
-        /// Generates a combined (academic + psychometric) report from the learner's OWN latest
-        /// stored data — the piece that makes the career assessment influence the dashboard
-        /// instead of standing alone as an isolated report.
-        /// </summary>
         [HttpPost("combined-analysis")]
         public async Task<IActionResult> AnalyzeCombined()
         {

@@ -39,6 +39,18 @@ namespace PathlyAI_API.Controllers
             return Ok(await _Billing.GetUsageSummaryAsync(userId));
         }
 
+        /// <summary>What the checkout UI needs to know about this deployment.</summary>
+        [AllowAnonymous]
+        [HttpGet("config")]
+        public IActionResult GetConfig()
+        {
+            return Ok(new BillingConfigDto
+            {
+                PaymentsEnabled = _Billing.PaymentsEnabled,
+                DevActivationEnabled = _Billing.DevActivationEnabled
+            });
+        }
+
         /// <summary>Starts a hosted checkout for the given plan code and returns the payment URL.</summary>
         [Authorize]
         [HttpPost("checkout/{planCode}")]
@@ -62,6 +74,58 @@ namespace PathlyAI_API.Controllers
                 return NotFound(new { message = ex.Message });
             }
             catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Called by the SPA after the provider redirects back. Confirms the charge and activates
+        /// the plan, so an upgrade is visible immediately even without a webhook delivery.
+        /// </summary>
+        [Authorize]
+        [HttpPost("verify/{reference}")]
+        public async Task<IActionResult> VerifyCheckout(string reference)
+        {
+            var userId = User.FindFirstValue("extension_userId");
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return Unauthorized(new { message = "A valid access token is required." });
+            }
+
+            var result = await _Billing.VerifyCheckoutAsync(userId, reference);
+
+            return result.Success
+                ? Ok(result)
+                : StatusCode(StatusCodes.Status402PaymentRequired, result);
+        }
+
+        /// <summary>
+        /// Development-only plan activation. The service refuses unless the app runs in
+        /// Development with Billing:AllowDevActivation enabled.
+        /// </summary>
+        [Authorize]
+        [HttpPost("dev/activate/{planCode}")]
+        public async Task<IActionResult> ActivateForDevelopment(string planCode)
+        {
+            var userId = User.FindFirstValue("extension_userId");
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return Unauthorized(new { message = "A valid access token is required." });
+            }
+
+            if (!_Billing.DevActivationEnabled)
+            {
+                return NotFound(new { message = "Direct plan activation is not available in this environment." });
+            }
+
+            try
+            {
+                return Ok(await _Billing.ActivatePlanForDevelopmentAsync(userId, planCode));
+            }
+            catch (PlanNotFoundException ex)
             {
                 return NotFound(new { message = ex.Message });
             }

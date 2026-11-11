@@ -242,6 +242,10 @@ namespace Pathly_Services
                         ? "This password reset link is invalid or has expired."
                         : errors);
             }
+
+            // ResetPassword rotates Identity's security stamp. Revoke every refresh-token
+            // session too, so no browser/device can silently renew after the password changes.
+            await RevokeAllRefreshTokensAsync(user.Id);
         }
 
         public async Task ConfirmEmailAsync(ConfirmEmailDto dto)
@@ -314,10 +318,16 @@ namespace Pathly_Services
 
         private async Task<ResponseUserDto> IssueTokensAsync(UserDto dto)
         {
-            var response = BuildAccessToken(dto);
+            var user = string.IsNullOrWhiteSpace(dto.Id)
+                ? null
+                : await _UserManager.FindByIdAsync(dto.Id);
+            var securityStamp = user is null ? null : await _UserManager.GetSecurityStampAsync(user);
+            var response = BuildAccessToken(dto, securityStamp);
 
             if (!string.IsNullOrWhiteSpace(dto.Id))
             {
+                response.Plan = await ResolvePlanTierAsync(dto.Id);
+
                 var rawRefreshToken = GenerateRawToken();
 
                 var entity = new RefreshToken
@@ -393,7 +403,10 @@ namespace Pathly_Services
             await _RefreshTokens.AddAsync(replacement);
             await _RefreshTokens.SaveChangesAsync();
 
-            var response = BuildAccessToken(_Mapper.Map<UserDto>(user));
+            var response = BuildAccessToken(
+                _Mapper.Map<UserDto>(user),
+                await _UserManager.GetSecurityStampAsync(user));
+            response.Plan = await ResolvePlanTierAsync(user.Id);
             response.RefreshToken = newRawToken;
 
             return response;
@@ -418,11 +431,53 @@ namespace Pathly_Services
             await _RefreshTokens.SaveChangesAsync();
         }
 
+        private async Task RevokeAllRefreshTokensAsync(string userId)
+        {
+            var activeTokens = await _RefreshTokens.GetActiveForUserAsync(userId);
+            if (activeTokens.Count == 0)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            foreach (var token in activeTokens)
+            {
+                token.RevokedAtUtc = now;
+                _RefreshTokens.Update(token);
+            }
+
+            await _RefreshTokens.SaveChangesAsync();
+        }
+
         private int RefreshTokenDays => _AuthSettings.RefreshTokenDays > 0 ? _AuthSettings.RefreshTokenDays : 30;
 
         private int AccessTokenMinutes => _AuthSettings.AccessTokenMinutes > 0 ? _AuthSettings.AccessTokenMinutes : 60;
 
-        private ResponseUserDto BuildAccessToken(UserDto dto)
+        /// <summary>
+        /// Collapses the account's active subscription into the three tiers the app exposes.
+        /// The tier is derived from entitlements rather than the raw plan code, so legacy
+        /// catalogue codes keep working: a plan with premium analysis is Premium, any other
+        /// paid plan is Standard, and no active subscription is Free.
+        /// </summary>
+        private async Task<string> ResolvePlanTierAsync(string? userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return "free";
+            }
+
+            var subscription = await _Unit.UserSubscription.GetActiveForUserAsync(userId);
+            var plan = subscription?.Plan;
+
+            if (plan is null)
+            {
+                return "free";
+            }
+
+            return plan.IncludesPremiumAnalysis ? "premium" : "standard";
+        }
+
+        private ResponseUserDto BuildAccessToken(UserDto dto, string? securityStamp)
         {
             var jwtKey = _Configuration["Jwt:Key"];
             var jwtIssuer = _Configuration["Jwt:Issuer"];
@@ -444,6 +499,12 @@ namespace Pathly_Services
                  new Claim("extension_userId", dto.Id ?? string.Empty),
                  new Claim("extension_FullName", dto.FullName ?? string.Empty)
             };
+
+            if (!string.IsNullOrWhiteSpace(securityStamp))
+            {
+                // Do not expose Identity's raw security stamp in the browser-visible JWT.
+                claims.Add(new Claim("security_stamp_hash", HashSecurityStamp(securityStamp)));
+            }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -474,6 +535,11 @@ namespace Pathly_Services
         private static string HashToken(string rawToken)
         {
             return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+        }
+
+        private static string HashSecurityStamp(string securityStamp)
+        {
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(securityStamp)));
         }
     }
 }

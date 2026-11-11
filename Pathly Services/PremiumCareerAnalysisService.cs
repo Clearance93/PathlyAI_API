@@ -202,6 +202,7 @@ namespace Pathly_Services
                 academicRecord, apsResult, careerEvidence, psychometricProfile, subjectSetHash);
 
             ReconcileApsAnalysis(aiResponse, apsResult, academicRecord);
+            SubjectResultsReconciler.Reconcile(aiResponse, academicRecord.Subjects, apsResult.Subjects);
 
             // Deterministic guard: keep the roadmap on the single institution the top career names
             // (same check as Layer 1) so a premium report can never contradict itself either.
@@ -479,15 +480,11 @@ namespace Pathly_Services
 
         private void ReconcileApsAnalysis(AiResponseDto aiResponse, ApsResultDto apsResult, ExtractedAcademicRecordDto? record)
         {
-            var analysis = aiResponse.ApsAnalysis;
-
-            if (analysis is null)
-            {
-                return;
-            }
+            var analysis = aiResponse.ApsAnalysis ??= new ApsAnalysisDto();
 
             analysis.CalculatedAps = apsResult.TotalAps;
             analysis.ApsExplanation = _ApsCalculation.GetApsExplanation(apsResult.TotalAps);
+            analysis.QualificationMessage = apsResult.QualificationLevel;
 
             // For a gated (mid-year / non-final-year) driver, no hard qualification verdict may be
             // emitted: blank out the university admit lists and force qualifiesForUniversity false.
@@ -504,6 +501,9 @@ namespace Pathly_Services
 
             if (allUniversities.Count == 0)
             {
+                analysis.UniversitiesTheyQualifyFor = new List<UniversityQualificationDto>();
+                analysis.UniversitiesTheyDoNotQualifyFor = new List<UniversityQualificationDto>();
+                analysis.QualifiesForUniveisty = false;
                 return;
             }
 

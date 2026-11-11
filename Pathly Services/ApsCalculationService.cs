@@ -57,7 +57,7 @@ namespace Pathly_Services
 
             result.Distinctions = subjects.Count(x => (x.NumericMark ?? 0) >= 80);
 
-            // A non-final (mid-year) or non-final-year driver is "current standing — indicative",
+            // A non-final (mid-year) or non-final-year driver is "current standing ï¿½ indicative",
             // never an administrative qualification verdict. Only a final block on a final-year
             // (Gr 12 NSC) report may drive hard qualification language.
             result.QualificationLevel = isFinal && !isTertiaryOrAdult && IsFinalYearStudyLevel(studyLevel)
@@ -136,7 +136,7 @@ namespace Pathly_Services
             if (aps >= 18)
                 return "Indicative standing: tracking toward a Higher Certificate Pass (final year results will confirm)";
 
-            return "Indicative current standing only — this is a mid-year/non-final snapshot and is not an admission verdict. The final year-end results determine university eligibility.";
+            return "Indicative current standing only ï¿½ this is a mid-year/non-final snapshot and is not an admission verdict. The final year-end results determine university eligibility.";
         }
 
         private int ConvertMarkToAPS(int mark)
@@ -173,10 +173,9 @@ namespace Pathly_Services
 
         public string GetApsExplanation(int aps)
         {
-            if (aps >= 30) return $"APS {aps} — Qualifies for most university programmes.";
-            if (aps >= 20) return $"APS {aps} — Qualifies for some diploma and certificate programmes.";
-
-            return $"APS {aps} — May need to consider bridging courses or upgrading subjects.";
+            return $"APS {aps} is calculated from the included subject marks. Institutions and programmes " +
+                   "may count subjects differently and have additional requirements; confirm current entry " +
+                   "criteria with the institution before making decisions.";
         }
     }
 }

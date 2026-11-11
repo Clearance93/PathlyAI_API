@@ -97,5 +97,21 @@ namespace Pathly_Tests
             var loSubject = final.Subjects!.First(s => s.SubjectName == "Life Orientation");
             Assert.False(loSubject.IncludedInCalculation);
         }
+
+        [Fact]
+        public void ReportedExample_UsesCorrectLevelsAndAddsTheSamePointsAsItsSubjects()
+        {
+            var result = _sut.CalculateAPS(new List<ExtractedSubjectDto>
+            {
+                new() { SubjectName = "Mathematics", NumericMark = 80 },
+                new() { SubjectName = "Information Technology", NumericMark = 50 },
+                new() { SubjectName = "English", NumericMark = 100 },
+                new() { SubjectName = "Accounting", NumericMark = 33 },
+            });
+
+            Assert.Equal(new[] { 7, 4, 7, 2 }, result.Subjects!.Select(s => s.ApsPoints));
+            Assert.Equal(20, result.TotalAps);
+            Assert.Equal(result.Subjects.Where(s => s.IncludedInCalculation).Sum(s => s.ApsPoints), result.TotalAps);
+        }
     }
 }

@@ -93,14 +93,29 @@ namespace PathlyAI_API.Controllers
                 return Unauthorized(new { message = "A valid access token is required." });
             }
 
-            var latest = await _PsychometricService.GetLatestForUserAsync(userId);
-
-            if (latest is null)
+            try
             {
-                return NotFound(new { message = "No stored psychometric assessment exists for your account yet." });
-            }
+                // Psychometrics are Premium-only; Free and Standard never receive profile data.
+                await _Billing.EnsurePremiumEntitlementAsync(userId);
 
-            return Ok(latest);
+                var latest = await _PsychometricService.GetLatestForUserAsync(userId);
+
+                if (latest is null)
+                {
+                    return NotFound(new { message = "No stored psychometric assessment exists for your account yet." });
+                }
+
+                return Ok(latest);
+            }
+            catch (QuotaExceededException ex)
+            {
+                return StatusCode(StatusCodes.Status402PaymentRequired, new
+                {
+                    error = "premium_required",
+                    message = ex.Message,
+                    upgradePlan = ex.RequiredPlanHint
+                });
+            }
         }
     }
 }

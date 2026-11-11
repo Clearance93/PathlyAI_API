@@ -46,8 +46,8 @@ namespace Pathly_Services
             if (string.IsNullOrWhiteSpace(rawText) || rawText.Trim().Length < MinimumUsableTextLength)
             {
                 throw new DocumentTextExtractionException(
-                    "Could not read enough text from this file. If it's a scanned/photographed " +
-                    "PDF with no text layer, please upload it as a JPG/PNG image instead so OCR can run on it.");
+                    "Could not read enough text from this file. If it is a scan, try a sharper, " +
+                    "straight-on copy with the full results page in frame, or upload the page as a JPG/PNG image.");
             }
 
             var compactedText = CompactText(rawText);
@@ -90,8 +90,8 @@ namespace Pathly_Services
             {
                 throw new DocumentTextExtractionException(
                     "We couldn't identify any subjects with marks in this document. " +
-                    "If it's a scanned/photographed PDF, please upload it as a JPG/PNG image " +
-                    "instead so OCR can run on it.");
+                    "For a scan, try a sharper, straight-on copy with the full results page in frame, " +
+                    "or upload the page as a JPG/PNG image.");
             }
 
             record.ExtractionAcademicRecordId = Guid.NewGuid();
@@ -243,8 +243,10 @@ namespace Pathly_Services
 
             if (isPdf)
             {
-                // Born-digital PDFs have a real text layer (no OCR, no quality gate needed).
-                return (PdfTextExtractor.ExtractText(fileBytes), null);
+                // Prefer a PDF's text layer, but OCR embedded page images when the scan has no
+                // usable text layer so clear scanned PDFs work without conversion to JPG/PNG.
+                var pdfText = PdfTextExtractor.ExtractText(fileBytes, out var pdfOcrQuality);
+                return (pdfText, pdfOcrQuality);
             }
 
             // Photo/scan ? Tesseract OCR. Evaluate the raw output before trusting it.

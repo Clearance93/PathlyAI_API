@@ -18,18 +18,34 @@ namespace Pathly_Data
                 new()
                 {
                     Code = "free", Name = "Free", Audience = PlanAudience.Individual,
-                    Description = "Upload results, APS calculation, basic career matches.",
+                    Description = "Preview every report section with one sample item. Psychometrics are Premium-only.",
                     Interval = PlanInterval.OneOff, PriceInCents = 0,
-                    MonthlyAnalysisQuota = 5, MonthlyPsychometricQuota = 2, IncludesPremiumAnalysis = false,
+                    MonthlyAnalysisQuota = 5, MonthlyPsychometricQuota = 0, IncludesPremiumAnalysis = false,
                     DisplayOrder = 0
+                },
+                new()
+                {
+                    Code = "standard", Name = "Standard", Audience = PlanAudience.Individual,
+                    Description = "The complete academic (student) report: matches, demand, outlook, APS and study guidance. No psychometrics.",
+                    Interval = PlanInterval.Monthly, PriceInCents = 4900,
+                    MonthlyAnalysisQuota = 15, MonthlyPsychometricQuota = 0, IncludesPremiumAnalysis = false,
+                    DisplayOrder = 1
+                },
+                new()
+                {
+                    Code = "premium", Name = "Premium", Audience = PlanAudience.Individual,
+                    Description = "Everything in Standard plus the Career Interest (psychometric) assessment and combined academic + interest report.",
+                    Interval = PlanInterval.Monthly, PriceInCents = 9900,
+                    MonthlyAnalysisQuota = null, MonthlyPsychometricQuota = null, IncludesPremiumAnalysis = true,
+                    DisplayOrder = 2
                 },
                 new()
                 {
                     Code = "career_report", Name = "Career Report", Audience = PlanAudience.Individual,
                     Description = "Full academic career report: matches, universities, subject requirements, roadmap.",
                     Interval = PlanInterval.OneOff, PriceInCents = 12900,
-                    MonthlyAnalysisQuota = 10, MonthlyPsychometricQuota = 2, IncludesPremiumAnalysis = false,
-                    DisplayOrder = 1
+                    MonthlyAnalysisQuota = 10, MonthlyPsychometricQuota = 0, IncludesPremiumAnalysis = false,
+                    DisplayOrder = 3
                 },
                 new()
                 {
@@ -37,7 +53,7 @@ namespace Pathly_Data
                     Description = "RIASEC assessment combined with your academics for deeper matching.",
                     Interval = PlanInterval.OneOff, PriceInCents = 34900,
                     MonthlyAnalysisQuota = 5, MonthlyPsychometricQuota = 10, IncludesPremiumAnalysis = true,
-                    DisplayOrder = 2
+                    DisplayOrder = 4
                 },
                 new()
                 {
@@ -45,7 +61,7 @@ namespace Pathly_Data
                     Description = "Unlimited analyses, AI assistant, bursaries and application planning.",
                     Interval = PlanInterval.Monthly, PriceInCents = 9900,
                     MonthlyAnalysisQuota = null, MonthlyPsychometricQuota = null, IncludesPremiumAnalysis = true,
-                    DisplayOrder = 3
+                    DisplayOrder = 5
                 },
                 new()
                 {
@@ -53,7 +69,7 @@ namespace Pathly_Data
                     Description = "Degree-to-career mapping, skills gap analysis and internship guidance.",
                     Interval = PlanInterval.Monthly, PriceInCents = 4900,
                     MonthlyAnalysisQuota = 15, MonthlyPsychometricQuota = 5, IncludesPremiumAnalysis = true,
-                    DisplayOrder = 4
+                    DisplayOrder = 6
                 },
                 new()
                 {
@@ -61,15 +77,15 @@ namespace Pathly_Data
                     Description = "For psychologists and career counsellors: client assessments, reports and tracking.",
                     Interval = PlanInterval.Monthly, PriceInCents = 49900,
                     MonthlyAnalysisQuota = null, MonthlyPsychometricQuota = null, IncludesPremiumAnalysis = true,
-                    DisplayOrder = 5
+                    DisplayOrder = 7
                 },
                 new()
                 {
                     Code = "school_starter", Name = "School Starter", Audience = PlanAudience.Organization,
                     Description = "Up to 100 learners/year: analyses, matching, dashboards and reports.",
                     Interval = PlanInterval.Annually, PriceInCents = 500000,
-                    MonthlyAnalysisQuota = null, MonthlyPsychometricQuota = 200, IncludesPremiumAnalysis = false,
-                    DisplayOrder = 6
+                    MonthlyAnalysisQuota = null, MonthlyPsychometricQuota = 0, IncludesPremiumAnalysis = false,
+                    DisplayOrder = 8
                 },
                 new()
                 {
@@ -77,7 +93,7 @@ namespace Pathly_Data
                     Description = "Up to 300 learners/year with grade-level analytics and parent reports.",
                     Interval = PlanInterval.Annually, PriceInCents = 1000000,
                     MonthlyAnalysisQuota = null, MonthlyPsychometricQuota = 600, IncludesPremiumAnalysis = true,
-                    DisplayOrder = 7
+                    DisplayOrder = 9
                 },
                 new()
                 {
@@ -85,7 +101,7 @@ namespace Pathly_Data
                     Description = "Up to 500 learners/year: full psychometrics, counsellor tools, priority support.",
                     Interval = PlanInterval.Annually, PriceInCents = 2000000,
                     MonthlyAnalysisQuota = null, MonthlyPsychometricQuota = null, IncludesPremiumAnalysis = true,
-                    DisplayOrder = 8
+                    DisplayOrder = 10
                 }
             };
 

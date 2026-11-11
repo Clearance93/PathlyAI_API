@@ -47,6 +47,7 @@ namespace Pathly_Utility
             services.Configure<GroqSettings>(configuratio.GetSection("Groq"));
             services.Configure<CareerMatchWeightsOptions>(configuratio.GetSection("CareerMatchWeights"));
             services.Configure<PaystackSettings>(configuratio.GetSection("Paystack"));
+            services.Configure<BillingSettings>(configuratio.GetSection("Billing"));
             services.Configure<SmtpSettings>(configuratio.GetSection("Smtp"));
             services.Configure<AppSettings>(configuratio.GetSection("App"));
             services.Configure<AuthSettings>(configuratio.GetSection("Auth"));

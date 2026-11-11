@@ -91,6 +91,7 @@ namespace Pathly_Services
             var (aiResponse, servedFromCache) = await GetAiResponseAsync(academicRecord, apsResult, careerEvidence, psychometricProfile, subjectSetHash);
 
             ReconcileApsAnalysis(aiResponse, apsResult, academicRecord);
+            SubjectResultsReconciler.Reconcile(aiResponse, academicRecord.Subjects, apsResult.Subjects);
 
             // Deterministic guard: the LLM must not send the learner to two different institutions
             // (e.g. UCT robotics while doing a UP degree). Repair the roadmap to the recommended
@@ -359,16 +360,11 @@ namespace Pathly_Services
 
         private void ReconcileApsAnalysis(AiResponseDto aiResponse, ApsResultDto apsResult, ExtractedAcademicRecordDto? record)
         {
-            var analysis = aiResponse.ApsAnalysis;
-
-            if (analysis is null)
-            {
-                return;
-            }
+            var analysis = aiResponse.ApsAnalysis ??= new ApsAnalysisDto();
 
             analysis.CalculatedAps = apsResult.TotalAps;
-
             analysis.ApsExplanation = _ApsCalculation.GetApsExplanation(apsResult.TotalAps);
+            analysis.QualificationMessage = apsResult.QualificationLevel;
 
             // For a gated (mid-year / non-final-year) driver, no hard qualification verdict may be
             // emitted: blank out the university admit lists and force qualifiesForUniversity false.
@@ -386,6 +382,9 @@ namespace Pathly_Services
 
             if (allUniversities.Count == 0)
             {
+                analysis.UniversitiesTheyQualifyFor = new List<UniversityQualificationDto>();
+                analysis.UniversitiesTheyDoNotQualifyFor = new List<UniversityQualificationDto>();
+                analysis.QualifiesForUniveisty = false;
                 return;
             }
 
