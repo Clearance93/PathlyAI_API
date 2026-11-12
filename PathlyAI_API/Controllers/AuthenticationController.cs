@@ -97,7 +97,12 @@ namespace PathlyAI_API.Controllers
             }
             catch (InvalidCredentialsException)
             {
-                return Unauthorized(new { message = "Invalid email or password." });
+                // Keep the response identical for unknown emails and wrong passwords to avoid
+                // account enumeration, while warning everyone about the temporary lockout policy.
+                return Unauthorized(new
+                {
+                    message = "Invalid email or password. Repeated failed sign-in attempts may temporarily lock access."
+                });
             }
         }
 
